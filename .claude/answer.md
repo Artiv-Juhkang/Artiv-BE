@@ -112,6 +112,48 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 1 — 공통 기반: 전역 예외 처리 ✅ 완료 (커밋: `feat: STEP 1 ...`)
+
+### 목표
+잘못된 요청이 들어와도 **앱 전체가 똑같은 형식의 에러 JSON**으로 응답하게 한다(프론트가 의존하는 계약).
+
+### ★ 반드시 알아야 할 핵심
+1. **에러 응답 형식을 한 곳에서 통일.** `@RestControllerAdvice`가 모든 컨트롤러의 예외를 가로채 같은 모양의 JSON으로 변환 → 프론트는 항상 `{status, code, message, fieldErrors}`만 보면 됨.
+2. **에러는 `ErrorCode` enum 카탈로그로 관리.** 코드·HTTP상태·기본메시지를 한 곳에. 서비스에선 `throw new BusinessException(ErrorCode.XXX)`만.
+3. **TDD로 작성.** 테스트(통일 에러 JSON 기대) 먼저 → 실패(RED) → 최소 구현 → 통과(GREEN). "테스트를 먼저 실패시켜 봐야 그 테스트가 진짜 검증하는지 안다."
+4. **일부러 덜 만들었다(단순성 우선).** `BaseEntity`+Auditing, 페이징 DTO는 **실제로 쓰는 STEP(2·3)** 에서 엔티티·페이징과 함께 테스트와 같이 추가. 지금 만들면 쓰는 데 없는 죽은 코드.
+
+### 작업 내역
+| 파일 | 한 일 | 왜 |
+|---|---|---|
+| `ErrorCode` | 에러 카탈로그 enum(코드+HTTP상태+메시지) | 에러 정의를 한 곳에, 중복 제거 |
+| `BusinessException` | `ErrorCode`를 담는 런타임 예외 | 서비스가 의미 있는 예외를 던지게 |
+| `ErrorResponse` | 응답 DTO(record): status/code/message/fieldErrors | 통일된 에러 본문 |
+| `GlobalExceptionHandler` | `@RestControllerAdvice`: 비즈니스/검증/그 외(fallback) 처리 | 예외→JSON 변환을 한 곳에서 |
+| `GlobalExceptionHandlerTest` | standalone MockMvc로 검증·비즈니스 예외 응답 검증 | 완료기준 자동 증명 |
+
+처리 예외 3종: `BusinessException`(→ ErrorCode의 상태), `MethodArgumentNotValidException`(@Valid 검증 실패 → 400 + 필드별 오류), 그 외 `Exception`(→ 500, 원본 로그).
+
+### 검증
+- `./gradlew test` → `GlobalExceptionHandlerTest` 2건 통과(tests=2, failures=0):
+  - 검증 실패(POST 빈 `name`) → 400 + `code=INVALID_INPUT` + `fieldErrors[0].field=name`
+  - 비즈니스 예외 → 404 + `code=ENTITY_NOT_FOUND`
+- DB·서버 없이 도는 빠른 단위 테스트. 실엔드포인트 통합 검증은 STEP 2(signup `@Valid`)에서 자연히 이뤄짐.
+
+### 오류/특이사항
+- TDD의 **의도된 RED**(production 클래스 부재로 컴파일 실패)를 먼저 확인한 것 외에 실제 오류 없음.
+
+### 키워드
+- **`@RestControllerAdvice`:** 모든 컨트롤러에 공통 적용되는 예외 처리기.
+- **`@ExceptionHandler`:** 특정 예외 타입을 잡아 응답으로 변환하는 메서드 표시.
+- **Bean Validation(`@Valid`/`@NotBlank`):** 요청 DTO 제약을 선언, 위반 시 `MethodArgumentNotValidException` 발생.
+- **`MethodArgumentNotValidException`:** `@Valid` 본문 검증 실패 시 스프링이 던지는 예외(여기서 필드별 오류 추출).
+- **record:** 불변 데이터 객체를 간결히 만드는 Java 문법. Jackson이 JSON으로 직렬화.
+- **fallback 핸들러:** 예상 못 한 예외를 500으로 감싸되 **원본은 로그**로 남겨 디버깅 가능하게.
+- **standalone MockMvc:** 스프링 컨텍스트 없이 컨트롤러+advice만 올려 빠르게 테스트.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
