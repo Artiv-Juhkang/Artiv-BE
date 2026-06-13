@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: AppToon
+  profiles:
+    default: dev
+  jpa:
+    hibernate:
+      ddl-auto: validate          # 스키마는 Flyway 가 소유. Hibernate 는 검증만.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 200MB
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-validity: 3600000        # 1시간 (ms)
+  refresh-token-validity: 1209600000    # 14일 (ms)

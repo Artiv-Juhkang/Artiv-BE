@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: apptoon-db
+    environment:
+      POSTGRES_DB: apptoon
+      POSTGRES_USER: apptoon
+      POSTGRES_PASSWORD: devpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - apptoon-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apptoon -d apptoon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  apptoon-db-data:

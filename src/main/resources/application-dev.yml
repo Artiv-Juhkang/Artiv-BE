@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/apptoon}
+    username: ${DB_USER:apptoon}
+    password: ${DB_PASSWORD:devpass}
+  jpa:
+    show-sql: true
+
+# 개발 편의용 기본값 — 운영(prod)에서는 환경변수로 반드시 덮어쓴다.
+jwt:
+  secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-0123456789abcdef}
+
+logging:
+  level:
+    org.hibernate.SQL: debug
