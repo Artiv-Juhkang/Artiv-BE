@@ -134,14 +134,30 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 처리 예외 3종: `BusinessException`(→ ErrorCode의 상태), `MethodArgumentNotValidException`(@Valid 검증 실패 → 400 + 필드별 오류), 그 외 `Exception`(→ 500, 원본 로그).
 
+**실제 에러 응답 예시** (검증 실패 시):
+```json
+{
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "입력값이 올바르지 않습니다.",
+  "fieldErrors": [ { "field": "name", "reason": "공백일 수 없습니다" } ]
+}
+```
+프론트는 어떤 에러든 이 형식만 보면 된다(성공 응답은 래핑 없이 DTO를 그대로 반환하기로 결정 — error만 표준 envelope).
+
 ### 검증
 - `./gradlew test` → `GlobalExceptionHandlerTest` 2건 통과(tests=2, failures=0):
   - 검증 실패(POST 빈 `name`) → 400 + `code=INVALID_INPUT` + `fieldErrors[0].field=name`
   - 비즈니스 예외 → 404 + `code=ENTITY_NOT_FOUND`
 - DB·서버 없이 도는 빠른 단위 테스트. 실엔드포인트 통합 검증은 STEP 2(signup `@Valid`)에서 자연히 이뤄짐.
 
+### TDD 흐름 (RED → GREEN → REFACTOR)
+1. **RED:** 테스트(`GlobalExceptionHandlerTest`)를 먼저 작성 → `./gradlew test`가 **컴파일 실패**(`cannot find symbol: GlobalExceptionHandler / BusinessException / ErrorCode`). "기능이 아직 없음"을 눈으로 확인.
+2. **GREEN:** production 4개 클래스를 최소 구현 → 재실행 시 2건 통과(`tests=2, failures=0, skipped=0`).
+3. **REFACTOR:** 코드가 이미 최소·명확해 손볼 것 없음.
+
 ### 오류/특이사항
-- TDD의 **의도된 RED**(production 클래스 부재로 컴파일 실패)를 먼저 확인한 것 외에 실제 오류 없음.
+- 위 **의도된 RED**(production 부재로 컴파일 실패) 외에 실제로 막힌 오류는 없었다(깨끗한 진행). STEP 0과 달리 별도 "오류 분류" 섹션을 둘 사건이 없음.
 
 ### 키워드
 - **`@RestControllerAdvice`:** 모든 컨트롤러에 공통 적용되는 예외 처리기.
