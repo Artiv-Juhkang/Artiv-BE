@@ -3,6 +3,7 @@ package com.juhkang.apptoon.global.exception;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,6 +31,13 @@ public class GlobalExceptionHandler {
                 .toList();
         return ResponseEntity.status(ErrorCode.INVALID_INPUT.getStatus())
                 .body(ErrorResponse.of(ErrorCode.INVALID_INPUT, fieldErrors));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        log.warn("AccessDenied: {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.FORBIDDEN.getStatus())
+                .body(ErrorResponse.of(ErrorCode.FORBIDDEN));
     }
 
     @ExceptionHandler(Exception.class)
