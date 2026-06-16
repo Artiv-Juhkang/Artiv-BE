@@ -215,6 +215,48 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 3 — Series(작품) + 분류 ✅ 완료 (커밋: `feat: STEP 3 ...`)
+
+### 목표
+작가(CREATOR)가 작품을 등록하고, 인증된 사용자는 요일/연령으로 필터링해 목록·상세를 조회한다.
+
+### ★ 반드시 알아야 할 핵심
+1. **연관관계는 LAZY + DTO 변환.** `Series.author`는 `@ManyToOne(LAZY)`. 목록에서 작가 닉네임이 필요하니 **fetch join**으로 한 쿼리에 가져와 N+1 제거(요약 DTO엔 `publishDays`는 빼서 컬렉션 N+1도 회피, 상세에서만 노출).
+2. **연재 요일은 `@ElementCollection`.** `Set<DayOfWeek>`를 별도 테이블 `series_publish_days`에 저장. 요일 필터는 JPQL `:day member of s.publishDays`(없으면 전체).
+3. **역할 기반 접근은 `@PreAuthorize`.** 등록은 `hasRole('CREATOR')` — READER 토큰이면 403. 거친 역할 게이트는 선언적 보안, 소유권·도메인 규칙은 Service.
+4. **페이징은 `Pageable`/`Page` + 표준 `PageResponse`.** 프론트는 `{content, page, size, totalElements, totalPages, last}`만 보면 됨. STEP 1에서 연기했던 페이징 DTO를 실사용과 함께 도입.
+5. **엔티티 추가 = 마이그레이션 동반:** `Series`+`series_publish_days` → `V3`.
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `Series`/`AgeRating`/`SeriesStatus`, `V3` | 작품 엔티티(작가 ManyToOne, 요일 ElementCollection) + 마이그레이션 |
+| `SeriesRepository.search` | 요일(member of)·연령 동적 필터 + fetch join + 페이징(countQuery 분리) |
+| `SeriesService` | 등록(작가 주입)/목록/상세, DTO 변환은 트랜잭션 안에서 |
+| `SeriesController` | POST(CREATOR)·GET 목록(필터/페이징)·GET 상세 |
+| `PageResponse<T>` | 공통 페이징 응답 |
+| `GlobalExceptionHandler` | `AccessDeniedException` → 통일 403 JSON |
+
+### 검증
+- `./gradlew test` → **17개 전부 통과**. `SeriesFlowTest` 3건: 등록 후 `day=MONDAY` 1건·`day=TUESDAY` 0건(요일 분류 정확), 독자 등록 403, 상세 조회.
+- 실서버: `V3`가 기존 데이터 있는 개발 DB에 적용(v3), `GET /api/series?day=MONDAY` → 200 + 페이징 envelope.
+
+### 오류/특이사항
+- **첫 빌드에 GREEN**(막힌 오류 없음). STEP 0~2에서 스택 함정을 이미 잡아둔 효과.
+- **주의(중요):** `@PreAuthorize` 거부는 `AccessDeniedException`을 던지는데, 이게 `@RestControllerAdvice`의 fallback(`Exception`→500)에 먼저 걸리면 **403이 500으로 둔갑**한다. → `AccessDeniedException` 전용 핸들러를 추가해 403(통일 JSON)으로 매핑.
+- 목록 요약에서 `publishDays`를 일부러 제외해 컬렉션 N+1 회피(상세에서만 로드).
+
+### 키워드
+- **`@ManyToOne`(LAZY):** 다대일 연관. 기본 LAZY, 필요 시 fetch join.
+- **`@ElementCollection`:** 엔티티 아닌 값들의 컬렉션(요일 집합)을 별도 테이블에 저장.
+- **fetch join:** 연관을 한 쿼리로 함께 조회해 N+1 제거. (단, 컬렉션 fetch join + 페이징은 위험 → 여기선 ManyToOne만 fetch.)
+- **`member of`:** JPQL에서 "값이 컬렉션에 속하는지" 검사.
+- **`Pageable`/`Page`/`@PageableDefault`:** 페이징 요청/결과. page·size·sort를 쿼리파라미터로.
+- **`@PreAuthorize("hasRole('CREATOR')")`:** 메서드 실행 전 역할 검사. 실패 시 403.
+- **N+1 문제:** 목록 N건마다 연관을 1건씩 더 조회하는 비효율. fetch join/배치로 해결.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
