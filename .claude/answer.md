@@ -170,6 +170,51 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 2 — User & 인증(JWT) ✅ 완료 (커밋: `feat: STEP 2-1/2-2/2-3 ...`)
+
+### 목표
+가입·로그인하면 토큰을 받고, 그 토큰으로 보호된 API에 접근한다. 없는/잘못된 토큰은 401로 거부.
+
+### ★ 반드시 알아야 할 핵심
+1. **액세스 토큰 = JWT(무상태), 리프레시 토큰 = 불투명 랜덤값(DB 저장).** 액세스는 서명만으로 검증(빠름·무상태), 리프레시는 DB에 두어 **회전·폐기 가능**(로그아웃/탈취 대응). JWT를 리프레시로 쓰면 `iat/exp`가 초 단위라 같은 초 재발급 시 동일 토큰이 되어 충돌 → 저장형은 랜덤 불투명값이 표준.
+2. **비밀번호는 BCrypt 단방향 해시로 저장.** 원문 저장 금지. 로그인은 `passwordEncoder.matches(원문, 해시)`로 비교.
+3. **인증 흐름:** 요청 → `JwtAuthenticationFilter`가 `Authorization: Bearer <jwt>` 검증 → `SecurityContext`에 사용자(권한 `ROLE_*`) 저장 → 컨트롤러는 `@AuthenticationPrincipal`로 사용자 ID 사용.
+4. **401 vs 403:** 토큰 없음/유효하지 않음 = **401**(`RestAuthenticationEntryPoint`), 로그인은 했으나 권한 부족 = **403**. 둘 다 STEP 1의 통일 에러 JSON으로 응답.
+5. **엔티티 추가 = Flyway 마이그레이션 동반.** `User`→`V1`, `RefreshToken`→`V2`. `ddl-auto=validate`라 마이그레이션 없으면 기동 실패(STEP 0의 약속대로).
+6. **회전(rotation):** 리프레시로 새 토큰쌍을 받으면 **기존 리프레시는 즉시 삭제** → 같은 토큰 재사용 시 401(탈취 토큰 무력화).
+
+### 작업 내역
+| 구분 | 핵심 파일 | 한 일 |
+|---|---|---|
+| 2-1 도메인 | `User`/`Role`/`UserRepository`, `BaseEntity`, `JpaConfig`, `V1` | 사용자 엔티티 + 감사 + 첫 마이그레이션 |
+| 2-2 가입·JWT | `AuthService.signup`, `SignupRequest`, PasswordEncoder 빈, `JwtProvider`, `JwtProperties` | BCrypt 가입(중복 검증) + 액세스 JWT 발급/검증 |
+| 2-3 로그인·필터 | `AuthService.login/refresh`, `RefreshToken`/Repo/`V2`, `JwtAuthenticationFilter`, `RestAuthenticationEntryPoint`, `SecurityConfig`, `AuthController`, `UserController(/me)` | 로그인·리프레시 회전 + 필터 배선 + 인증 API |
+
+성공 응답은 DTO 직접 반환(`TokenResponse`/`UserResponse`), 에러만 표준 envelope. **권한·자격 검증은 Service**(가입 중복·로그인 자격), **인증은 필터**.
+
+### 검증
+- `./gradlew test` → **14개 전부 통과**. 핵심은 `AuthFlowTest` 5건(통합): 가입→로그인→`/api/users/me` 200 / 토큰 없음 401 / 잘못된 토큰 401 / 틀린 비번 `INVALID_CREDENTIALS` 401 / 리프레시 회전(재사용 401).
+- **실제 서버(bootRun + curl)** 로도 확인: signup 201 · login 토큰 · me 200 · 무토큰 401 · 중복 409 — 모두 통일 에러 JSON. Flyway `V1`·`V2`가 개발 DB에 적용(v2).
+
+### 오류 사항 및 대처 (유형별) — STEP 2도 최신 스택 함정이 많았다
+- **F. 설계 결함 선제 수정:** 리프레시 토큰을 JWT로 만들면 같은 초 재발급 시 동일 토큰→유니크 충돌. → 구현 전에 **불투명 랜덤(SecureRandom 256bit)** 으로 전환(저장형 표준).
+- **G. 의존성(또 모듈 분리):** `ObjectMapper` 컴파일 불가 — **SB4는 `spring-boot-starter-webmvc`에 Jackson을 안 넣는다.** → `spring-boot-starter-json` 추가.
+- **H. Jackson 3 메이저 변경:** 패키지가 `com.fasterxml.jackson` → **`tools.jackson`** 으로 바뀜(SB4가 Jackson 3.x 사용). import 전부 교체. `JsonNode.asText()`는 deprecated → `asString()`.
+- **I. 부실한 테스트 수정:** "토큰 끝에 한 글자 추가" 변조가 검증을 통과(base64url 특성). 코드 버그가 아니라 **테스트의 변조가 무효** → "다른 키로 서명된 토큰 거부"로 교정(진짜 보안 속성 검증).
+
+### 키워드
+- **JWT(JSON Web Token):** `헤더.페이로드.서명`. 서명으로 위변조를 막음(비밀 없이 내용은 누구나 디코딩 가능 → 민감정보 넣지 말 것). 우리 액세스 토큰의 subject=userId, role 클레임.
+- **BCrypt:** salt가 포함된 단방향 비밀번호 해시. 같은 비번도 매번 다른 해시, 비교는 `matches`.
+- **인증(Authentication) vs 인가(Authorization):** 누구냐(필터에서) vs 이거 해도 되냐(`@PreAuthorize`/권한).
+- **`OncePerRequestFilter`:** 요청당 한 번 도는 필터. 여기서 JWT를 풀어 `SecurityContext`에 인증을 심는다.
+- **`SecurityContext` / `@AuthenticationPrincipal`:** 현재 요청의 인증 주체 보관소 / 컨트롤러에서 그 주체(여기선 userId)를 주입.
+- **`@EnableMethodSecurity` / `@PreAuthorize`:** 메서드 단위 권한 검사 활성화(STEP 7에서 본격 사용).
+- **`AuthenticationEntryPoint`:** 미인증 요청이 보호 자원에 닿았을 때의 처리(우리는 401 + 통일 JSON).
+- **리프레시 회전(rotation):** 리프레시 사용 시 새것 발급 + 기존 폐기. 탈취된 옛 토큰 무력화.
+- **`@ConfigurationProperties`:** `jwt.*` yml 설정을 타입 안전 객체(`JwtProperties`)로 바인딩.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
