@@ -16,38 +16,30 @@ import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+/**
+ * 액세스 토큰(JWT) 발급·검증 전담.
+ * 리프레시 토큰은 JWT가 아니라 DB에 저장되는 불투명 랜덤값이라 여기서 다루지 않는다({@link AuthService}).
+ */
 @Component
 public class JwtProvider {
 
     private final SecretKey key;
     private final long accessTokenValidity;
-    private final long refreshTokenValidity;
 
     public JwtProvider(JwtProperties properties) {
         this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
         this.accessTokenValidity = properties.accessTokenValidity();
-        this.refreshTokenValidity = properties.refreshTokenValidity();
     }
 
     public String createAccessToken(Long userId, Role role) {
-        return create(userId, role, accessTokenValidity);
-    }
-
-    public String createRefreshToken(Long userId) {
-        return create(userId, null, refreshTokenValidity);
-    }
-
-    private String create(Long userId, Role role, long validityMillis) {
         Instant now = Instant.now();
-        var builder = Jwts.builder()
+        return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim("role", role.name())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(validityMillis)))
-                .signWith(key);
-        if (role != null) {
-            builder.claim("role", role.name());
-        }
-        return builder.compact();
+                .expiration(Date.from(now.plusMillis(accessTokenValidity)))
+                .signWith(key)
+                .compact();
     }
 
     public Long getUserId(String token) {
