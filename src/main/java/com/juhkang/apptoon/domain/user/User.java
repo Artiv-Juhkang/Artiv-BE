@@ -58,4 +58,8 @@ public class User extends BaseEntity {
     public boolean isAdult(LocalDate today) {
         return birthDate != null && !birthDate.isAfter(today.minusYears(19));
     }
+
+    public void changeRole(Role role) {
+        this.role = role;
+    }
 }

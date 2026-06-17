@@ -11,10 +11,12 @@ import org.springframework.data.repository.query.Param;
 public interface SeriesRepository extends JpaRepository<Series, Long> {
 
     @Query(value = "select s from Series s join fetch s.author "
-            + "where (:day is null or :day member of s.publishDays) "
+            + "where s.visible = true "
+            + "and (:day is null or :day member of s.publishDays) "
             + "and (:ageRating is null or s.ageRating = :ageRating)",
             countQuery = "select count(s) from Series s "
-                    + "where (:day is null or :day member of s.publishDays) "
+                    + "where s.visible = true "
+                    + "and (:day is null or :day member of s.publishDays) "
                     + "and (:ageRating is null or s.ageRating = :ageRating)")
     Page<Series> search(@Param("day") DayOfWeek day, @Param("ageRating") AgeRating ageRating, Pageable pageable);
 }

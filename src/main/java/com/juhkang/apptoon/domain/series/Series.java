@@ -58,6 +58,9 @@ public class Series extends BaseEntity {
     @Column(name = "publish_day", length = 10)
     private Set<DayOfWeek> publishDays = new HashSet<>();
 
+    @Column(nullable = false)
+    private boolean visible = true;
+
     private Series(String title, String description, User author, AgeRating ageRating, SeriesStatus status,
                    Set<DayOfWeek> publishDays) {
         this.title = title;
@@ -71,5 +74,13 @@ public class Series extends BaseEntity {
     public static Series create(String title, String description, User author, AgeRating ageRating,
                                 SeriesStatus status, Set<DayOfWeek> publishDays) {
         return new Series(title, description, author, ageRating, status, publishDays);
+    }
+
+    public void changeAgeRating(AgeRating ageRating) {
+        this.ageRating = ageRating;
+    }
+
+    public void changeVisibility(boolean visible) {
+        this.visible = visible;
     }
 }
