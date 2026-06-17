@@ -346,6 +346,49 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 6 — 개인화(구독·읽음·UP) ✅ 완료 (커밋: `feat: STEP 6 ...`)
+
+### 목표
+독자가 작품을 **구독**하고 회차를 **읽음 처리**한다. 구독 목록에선 **안 본 새 회차가 있으면 UP**(읽으면 꺼짐), 마지막 읽은 회차로 **이어보기**를 안내한다.
+
+### ★ 반드시 알아야 할 핵심
+1. **UP은 "시각"이 아니라 "회차번호"로.** 계획서 정의(`최신 발행 시각 > 마지막 읽음 시각`)는 **예약발행(미래 publishAt) 시 읽어도 UP가 안 꺼지고**, 밀리초 충돌로 비결정적이다. → `최신 발행 회차번호 > 마지막 읽은 회차번호`로 구현. "읽으면 사라짐"을 결정적으로 만족하고, 같은 데이터로 이어보기(마지막 읽은 화)도 제공.
+2. **멱등(idempotent) 설계.** 중복 구독/중복 읽음은 에러가 아니라 **무시**(이미 있으면 그대로). 유니크 제약 `(user,series)`·`(user,episode)`로 DB에서도 한 번 더 보장.
+3. **N+1 회피 = 배치 집계.** 구독 N건마다 "최신 회차"·"읽은 회차"를 따로 조회하면 N+1 → `... where series_id in :ids group by series_id` 한 쿼리로 묶어 `Map`으로. STEP 3에서 세운 N+1 경계 유지.
+4. **인터페이스 프로젝션.** 집계 결과 `(seriesId, maxNo)`만 `SeriesMaxNo` 인터페이스 getter로 매핑(JPQL 별칭 `as seriesId/as maxNo` ↔ `getSeriesId()/getMaxNo()`). 엔티티 통째 로딩 없이 필요한 두 값만.
+5. **연관은 LAZY + `getReferenceById`.** 구독/읽음 insert엔 User·Series·Episode의 **프록시 참조**만 있으면 됨 → 불필요한 SELECT 없이 FK만 채운다. 엔티티 추가 = 마이그레이션 → `V6`.
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `Subscription`/`ReadLog`, `V6` | 구독·읽음 엔티티(각 유니크 제약) + 마이그레이션 |
+| `SubscriptionRepository` | exists/delete + 구독목록(`join fetch series`) |
+| `ReadLogRepository` | exists + 작품별 **마지막 읽은 회차** 배치 집계 |
+| `EpisodeRepository` | 작품별 **최신 발행 회차** 배치 집계 추가 |
+| `SeriesMaxNo`(projection) | `(seriesId, maxNo)` 집계 프로젝션(공통) |
+| `PersonalizationService` | 구독/취소(멱등)·읽음(멱등)·UP 계산(배치 2회) |
+| `PersonalizationController` | 구독·취소·읽음·내 구독목록 API |
+| `SubscriptionResponse` | seriesId/title/latestEpisodeNo/lastReadEpisodeNo/up |
+
+### 검증
+- `./gradlew test` → **28개 전부 통과**(신규 `PersonalizationFlowTest` 2 + 기존 26).
+  - 구독 → 1화 미열람 `up=true` → 1화 읽음 `up=false` → 2화 발행 `up=true` → 2화 읽음 `up=false`(latest/lastRead 회차번호 동반)
+  - 구독취소 → 목록에서 사라짐
+
+### 오류/특이사항
+- **계획서 UP 정의(시각 비교)를 회차번호 비교로 교체.** 사유: 예약발행 미래시각 시 "읽어도 UP 유지" 결함 + 밀리초 충돌 비결정성. 임의 변경이 아니라 *더 정확·결정적*이라 판단해 명시 후 진행.
+- **TDD.** 엔드포인트 부재 404(행위적 RED) → 구현 GREEN.
+- **멱등을 양쪽에서.** 코드(`exists` 선검사) + DB(유니크 제약) 모두로 중복 방지.
+
+### 키워드
+- **UP 플래그:** 구독 작품에 안 본 새 회차가 있음(`최신 발행 회차 > 마지막 읽은 회차`).
+- **멱등(idempotent):** 같은 요청을 여러 번 해도 결과 동일(중복 구독/읽음 무시).
+- **`getReferenceById`:** DB 조회 없이 프록시 참조만 얻어 FK 설정에 사용.
+- **인터페이스 프로젝션:** 쿼리 결과의 일부 컬럼만 인터페이스 getter로 매핑(가벼움).
+- **배치 집계(`group by` + `in`):** 작품 묶음을 한 쿼리로 집계해 N+1 제거.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
