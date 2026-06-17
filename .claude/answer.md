@@ -467,6 +467,46 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 9 — 회차 이미지 정적 서빙(/files) ✅ 완료 (커밋: `feat: STEP 9 ...`)
+
+### 목표
+STEP 4·5에서 **보류**했던 이미지 서빙을 닫는다. 저장만 하고 HTTP로 내려주지 못하던 회차 이미지를 `/files/**`로 정적 서빙해 **뷰어가 실제로 렌더**되게 한다. (재설계 워크플로 결론: 뷰어 코어가 이미지 서빙 부재로 완전 비동작 → 단독 최우선.)
+
+### ★ 반드시 알아야 할 핵심
+1. **정적 리소스 핸들러가 코드에 전무했다.** `WebMvcConfigurer` 구현(`WebConfig`)으로 `/files/**` → `file:${app.storage.root}/` 매핑. 저장 경로 규약(`{root}/{seriesId}/{episodeNo}/{order}.{ext}`)을 그대로 URL 경로로 노출. `EpisodeImageResponse.of()`가 저장 상대경로 앞에 **`/files/` 접두**를 붙여 프론트가 바로 GET할 절대경로를 준다(STEP 5의 "url=상대경로" 미결을 종결).
+2. **permitAll 트레이드오프(명시).** `/files/**`를 `SecurityConfig`에서 `permitAll` → URL을 알면 **비공개/성인물 이미지도 인가 없이 직접 접근** 가능. 학습 범위상 뷰어 즉시 동작을 우선해 정적 서빙 채택, 실제 문제화 시 **컨트롤러 기반 인증 서빙으로 승격**(보류). 디렉터리 트래버설(`../`)은 Spring `PathResourceResolver`가 location 하위로 제한해 차단.
+3. **미존재 정적 리소스 500→404 교정(TDD가 드러낸 결함).** `/files/없는파일`이 **500**으로 응답했다 — `GlobalExceptionHandler`의 catch-all(`Exception`→500)이 Spring의 `NoResourceFoundException`을 삼켰기 때문. 전용 핸들러를 추가해 **404(`ENTITY_NOT_FOUND`)**. 부수효과로 **알 수 없는 라우트**(예: 오타 `/api/...`)도 500→404로 정상화(프론트가 "없음"과 "서버오류"를 구분 가능).
+4. **마이그레이션 없음.** 스키마 변경 0, `app.storage.root` 설정만 사용. 기존 33개 테스트 회귀 없음(STEP 5의 `EpisodeViewerTest`는 `url` 존재만 단언 → 절대경로로 바뀌어도 통과).
+
+### 작업 내역
+| 파일 | 한 일 | 왜 |
+|---|---|---|
+| `WebConfig`(신규, `WebMvcConfigurer`) | `/files/**` → `file:${app.storage.root}/` 리소스 핸들러 + 트래버설 차단 주석 | 저장 이미지를 HTTP로 서빙 |
+| `SecurityConfig` | `/files/**` `permitAll` 한 줄 | 뷰어 이미지는 비인증 GET(트레이드오프 명시) |
+| `EpisodeImageResponse.of()` | `url`에 `/files/` 접두 | 프론트가 바로 GET할 절대경로 계약 |
+| `GlobalExceptionHandler` | `@ExceptionHandler(NoResourceFoundException)` → 404 | catch-all이 미존재 리소스를 500으로 삼키던 것 교정 |
+| `EpisodeImageResponseTest`(신규, 단위) | `of()`가 `/files/{path}` 반환 검증 | url 계약을 Spring 없이 빠르게 고정 |
+| `StaticFileServingTest`(신규, 통합) | 비인증 서빙 200·바이트 일치, 미존재 404(401 아님) | permitAll+핸들러 배선·404 회귀 보호 |
+
+### 검증
+- `./gradlew test` → **36개 전부 통과**(신규 단위 1 + 통합 2 + 기존 33, failures=0).
+- **RED 3건 확인**(의도된 실패): 단위 `expected "/files/1/2/0.png" but was "1/2/0.png"`, 통합 서빙 `expected 200 but was 401`(보안 차단), 미존재 `expected 404 but was 401`. → 구현 후 GREEN.
+- 통합 테스트는 `@DynamicPropertySource`로 `app.storage.root`를 임시 디렉터리로 지정하고 실제 파일을 써서 서빙을 검증(`@TempDir` 정적 필드 순서 함정 회피).
+
+### 오류/특이사항
+- **TDD가 잠복 결함을 드러냄.** "미존재 → 404" 테스트가 처음엔 **500**으로 실패 → catch-all이 `NoResourceFoundException`을 삼키는 구조를 발견 → 전용 404 핸들러로 교정(STEP 3의 `AccessDeniedException`→403 교정과 동일한 패턴: catch-all보다 **구체 핸들러**를 먼저).
+- **단위 테스트 격리:** `EpisodeImage.create(null, 0, "1/2/0.png", 800, 1200)` — `of()`는 `episode`를 안 읽으므로 연관(Episode→Series→User) 없이 path/크기만으로 검증 가능.
+- **content-type은 확장자 기반.** 정적 서빙 시 `.png`는 `MediaTypeFactory`가 `image/png`로 판정(파일 내용과 무관) → 테스트는 임의 바이트로도 content-type 검증 가능.
+
+### 키워드
+- **`WebMvcConfigurer`/`addResourceHandlers`:** URL 패턴(`/files/**`)을 파일 위치(`file:...`)에 매핑하는 정적 리소스 설정 훅.
+- **`addResourceLocations`:** 리소스를 찾을 베이스(끝에 `/` 필요). 우리는 `Path.toUri()`로 절대경로 + 트레일링 슬래시 보장.
+- **`PathResourceResolver`:** 요청 경로를 location 하위로 정규화·제한 → 디렉터리 트래버설 차단.
+- **`NoResourceFoundException`:** 매핑된 핸들러/정적 리소스가 없을 때 Spring이 던지는 예외(전용 처리 없으면 catch-all로 500 둔갑).
+- **`@DynamicPropertySource`:** 컨텍스트 기동 전 프로퍼티를 동적 주입(임시 storage 루트 지정).
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
