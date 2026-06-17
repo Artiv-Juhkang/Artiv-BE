@@ -257,6 +257,51 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 4 — Episode(회차) + 이미지 업로드 ✅ 완료 (커밋: `feat: STEP 4 ...`)
+
+### 목표
+작가(CREATOR)가 **본인 작품에** 회차를 등록하며 이미지 여러 장을 한 번에 업로드한다. 검증→리사이즈→로컬 저장→메타 기록까지 한 흐름으로 처리하고, **즉시 발행**과 **예약 발행**(시각 도래 시 자동 공개)을 지원한다.
+
+### ★ 반드시 알아야 할 핵심
+1. **멀티파트 업로드 = `@RequestPart`(파일) + `@RequestParam`(폼필드).** `title`/`publishAt`는 폼필드, `images[]`는 파일 파트. JSON 바디(`@RequestBody`)와는 못 섞는다(요청이 `multipart/form-data`).
+2. **이미지 파이프라인은 검증→리사이즈→저장→메타.** 검증(jpeg/png·비어있지 않음) → **Thumbnailator**로 폭 800 초과만 축소(이하 원본 유지) → `{root}/{seriesId}/{episodeNo}/{order}.{ext}` 저장 → DB에 경로·width·height 기록. 저장 루트는 `app.storage.root`(env로 분리), `/storage/`는 gitignore.
+3. **소유권은 Service에서.** `@PreAuthorize("hasRole('CREATOR')")`는 거친 역할 게이트일 뿐 — "**남의 작품엔 못 올린다**"는 `series.author.id == userId` 검사로 Service가 FORBIDDEN 처리(불변 규칙: 권한·소유권 검증은 Service).
+4. **예약 발행은 `@Scheduled` + 테스트 가능한 설계.** `publishAt`이 미래면 `SCHEDULED`로 저장, `EpisodePublisher`가 주기적으로 `publishDueEpisodes(now)`를 호출해 **도래분만** `PUBLISHED`로 전환. 시간 의존 로직을 **`now`를 인자로 받는 메서드로 분리** → 테스트는 스케줄러를 기다리지 않고 직접 호출해 검증한다(`@EnableScheduling` 필요).
+5. **회차 번호는 작품별 채번(`max+1`) + 유니크 제약 `(series_id, episode_no)`.** 엔티티 추가 = 마이그레이션 동반 → `V4`(episodes + episode_images).
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `Episode`/`EpisodeImage`/`EpisodeStatus`, `V4` | 회차·이미지 엔티티(`episodeNo` 유니크, 상태 enum STRING) + 마이그레이션 |
+| `ImageStorageService` | 검증·Thumbnailator 리사이즈·로컬 저장, 저장경로/치수 반환 |
+| `EpisodeService` | 업로드(소유권 검증·채번·즉시/예약 분기), 상세/발행목록, `publishDueEpisodes(now)` |
+| `EpisodePublisher`+`SchedulingConfig` | `@Scheduled`로 도래한 예약 회차 자동 발행, `@EnableScheduling` |
+| `EpisodeController` | POST 업로드(멀티파트, CREATOR)·GET 상세(이미지 순서)·GET 발행목록 |
+| dto 3종 | `EpisodeDetail`/`Summary`/`ImageResponse` (Entity 대신 DTO 노출) |
+| `ErrorCode` | `INVALID_IMAGE`(400)·`STORAGE_FAILED`(500) 추가 |
+| `build.gradle`/`application.yml` | thumbnailator 의존성 / `app.storage.root` |
+
+### 검증
+- `./gradlew test` → **21개 전부 통과**(신규 `EpisodeFlowTest` 4 + 기존 17). `contextLoads`로 `@EnableScheduling`·Publisher·StorageService 빈 배선 정상 기동 확인.
+  - 다중 업로드 시 **순서대로 저장** + 1200폭 이미지 **800으로 리사이즈**(400폭은 원본 유지)
+  - 독자 업로드 403, **다른 작가가 남의 작품** 업로드 403
+  - 예약 업로드는 `SCHEDULED`·발행목록 제외 → `publishDueEpisodes(도래시각)` 후 `PUBLISHED`·목록 노출
+
+### 오류/특이사항
+- **TDD RED→GREEN.** 엔드포인트 없을 땐 404로 먼저 실패(행위적 RED)시키고 구현, 예약발행은 `publishDueEpisodes` 미존재 **컴파일 실패(RED)** 후 구현.
+- **`@RequestParam Instant` 바인딩:** ISO-8601 문자열(`Instant.toString()`)이 별도 애너테이션 없이 변환됨(Spring `InstantFormatter`).
+- **`EpisodeImage`는 `BaseEntity` 미상속.** 불변 메타라 created/updated 불필요 → `episode_images` 테이블엔 타임스탬프 컬럼 없음.
+- **(의도적 범위 한계)** 이미지 바이트 **서빙은 보류**(저장+메타+경로까지). 독자가 `SCHEDULED` 회차 **상세**는 조회 가능(상태만 노출) → 발행 전 숨김은 후속 과제.
+
+### 키워드
+- **멀티파트(`multipart/form-data`):** 파일+필드 혼합 전송. `@RequestPart`(파일/파트), `@RequestParam`(폼필드).
+- **Thumbnailator:** 자바 이미지 리사이즈 라이브러리. `Thumbnails.of(img).width(n)` 비율 유지 축소.
+- **`@Scheduled`/`@EnableScheduling`:** 주기 실행. `fixedDelayString`으로 폴링 간격 설정.
+- **채번(`max+1`):** 작품별 회차 일련번호. DB 유니크 제약으로 중복 방지.
+- **발행 상태(DRAFT/SCHEDULED/PUBLISHED):** `publishAt` 도래 시 SCHEDULED→PUBLISHED 전환.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
