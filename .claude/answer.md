@@ -389,6 +389,48 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 7 — 관리자 기능(ADMIN) ✅ 완료 (커밋: `feat: STEP 7 ...`)
+
+### 목표
+관리자(ADMIN)만 **작가 권한 부여**(역할 변경)·**작품 연령등급 변경**·**작품 공개/비공개**를 처리한다. 비관리자는 403.
+
+### ★ 반드시 알아야 할 핵심
+1. **거친 역할 게이트는 `@PreAuthorize`, 클래스 레벨로.** `AdminController`에 클래스 단위 `@PreAuthorize("hasRole('ADMIN')")` 하나면 **모든 메서드**가 ADMIN 전용이 된다(메서드마다 안 붙여도 됨). 비관리자 → `AccessDeniedException` → STEP 3에서 만든 핸들러가 **통일 403 JSON**으로.
+2. **상태 변경은 도메인 메서드로(setter 남발 금지).** 엔티티에 `changeRole`·`changeAgeRating`·`changeVisibility`만 열어 의미 있는 변경점만 노출. JPA **더티 체킹**이 `@Transactional` 종료 시 UPDATE를 자동 생성(별도 save 불필요).
+3. **"작품 공개"는 목록 노출로 한정(MVP 경계).** `Series.visible`(기본 `true`) 추가 + 공개 목록 쿼리(`search`)에 `and s.visible = true`. **기본 true라 STEP 3~6 동작·테스트 전부 불변**. 상세 직접조회·회차 게이팅까지 숨기는 건 후속.
+4. **새 컬럼 = 마이그레이션 + 기존행 보존.** `V7`는 `add column visible boolean not null default true` → 기존 작품은 자동 공개. `ddl-auto=validate`라 컬럼·엔티티 일치 필요.
+5. **PATCH = 부분 수정.** 리소스 일부 필드만 바꾸는 의미. CSRF는 STATELESS라 비활성(토큰 인증).
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `User.changeRole` | 역할 변경 도메인 메서드 |
+| `Series`(+`visible`), `changeAgeRating`/`changeVisibility`, `V7` | 공개여부 필드(기본 true) + 변경 메서드 + 마이그레이션 |
+| `SeriesRepository.search` | 공개 목록에 `s.visible = true` 필터(query+countQuery) |
+| `AdminService` | 역할/연령등급/공개여부 변경(더티 체킹) |
+| `AdminController` | 클래스 레벨 `@PreAuthorize(ADMIN)` + PATCH 3종 |
+| dto 3종 | `Role`/`AgeRating`/`Visibility`UpdateRequest(`@NotNull`) |
+
+### 검증
+- `./gradlew test` → **32개 전부 통과**(신규 `AdminFlowTest` 4 + 기존 28). `SeriesFlowTest` 3건 그대로 → 기본 공개라 기존 동작 보존.
+  - 비관리자(CREATOR/READER) → admin API **403**
+  - 관리자 → 연령등급 변경 200(`ageRating=AGE_19`), 역할 부여 200(`role=CREATOR`)
+  - 관리자가 비공개 처리 → 공개 목록 `totalElements` 1 → 0
+
+### 오류/특이사항
+- **TDD.** 엔드포인트 부재 시 비관리자 요청은 404(403 아님)로 먼저 실패(행위적 RED) → 구현 후 403/200.
+- **범위 해석 명시:** "작품 공개"를 *브라우즈 목록 노출* 범위로 한정(상세 by-id·회차는 후속). 임의 결정 대신 가장 파급 적은 선택.
+- **`visible` 기본 true** 라 `Series.create` 시그니처 불변 → STEP 3~6 호출부/테스트 영향 없음(STEP 5 생년월일 때와 달리 파급 0).
+
+### 키워드
+- **클래스 레벨 `@PreAuthorize`:** 컨트롤러 전체 메서드에 같은 권한 규칙 일괄 적용.
+- **도메인 메서드 vs setter:** 의미 있는 변경점(`changeRole`)만 노출해 무분별한 상태 변경 차단.
+- **더티 체킹(dirty checking):** 영속 엔티티의 변경을 트랜잭션 커밋 때 자동 UPDATE.
+- **PATCH:** 리소스의 일부만 부분 수정하는 HTTP 메서드.
+- **소프트 가시성(visible):** 삭제하지 않고 노출만 끄는 공개/비공개 플래그.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
