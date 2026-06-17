@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,7 +22,8 @@ class UserRepositoryTest {
 
     @Test
     void 사용자를_저장하고_이메일로_조회하며_생성시각이_기록된다() {
-        User saved = userRepository.save(User.create("test@example.com", "encoded-pw", "테스터", Role.READER));
+        User saved = userRepository.save(
+                User.create("test@example.com", "encoded-pw", "테스터", Role.READER, LocalDate.of(1990, 1, 1)));
 
         User found = userRepository.findByEmail("test@example.com").orElseThrow();
 

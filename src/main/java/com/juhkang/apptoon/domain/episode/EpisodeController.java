@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
+import com.juhkang.apptoon.global.dto.SliceResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,12 +44,16 @@ public class EpisodeController {
     }
 
     @GetMapping("/{episodeNo}")
-    public EpisodeDetailResponse detail(@PathVariable Long seriesId, @PathVariable int episodeNo) {
-        return episodeService.getDetail(seriesId, episodeNo);
+    public EpisodeDetailResponse detail(@AuthenticationPrincipal Long userId,
+                                        @PathVariable Long seriesId,
+                                        @PathVariable int episodeNo) {
+        return episodeService.getDetail(seriesId, episodeNo, userId);
     }
 
     @GetMapping
-    public List<EpisodeSummaryResponse> list(@PathVariable Long seriesId) {
-        return episodeService.getPublishedList(seriesId);
+    public SliceResponse<EpisodeSummaryResponse> list(@AuthenticationPrincipal Long userId,
+                                                      @PathVariable Long seriesId,
+                                                      @PageableDefault(size = 20) Pageable pageable) {
+        return episodeService.getEpisodes(seriesId, userId, pageable);
     }
 }

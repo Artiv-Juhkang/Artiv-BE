@@ -40,7 +40,8 @@ class AuthFlowTest {
     private void signup(String email, String password, String nickname) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"nickname\":\"" + nickname + "\"}"))
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"nickname\":\"" + nickname
+                                + "\",\"birthDate\":\"2000-01-01\"}"))
                 .andExpect(status().isCreated());
     }
 

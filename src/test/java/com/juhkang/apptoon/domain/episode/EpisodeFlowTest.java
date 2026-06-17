@@ -36,12 +36,15 @@ import com.juhkang.apptoon.domain.user.UserRepository;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = "app.storage.root=build/test-episode-storage")
 @AutoConfigureMockMvc
 @Transactional
 class EpisodeFlowTest {
+
+    private static final LocalDate ADULT = LocalDate.of(1990, 1, 1);
 
     @Autowired
     private MockMvc mockMvc;
@@ -64,11 +67,11 @@ class EpisodeFlowTest {
     @BeforeEach
     void setUp() {
         User creator = userRepository.save(
-                User.create("creator@test.com", passwordEncoder.encode("password123"), "작가", Role.CREATOR));
+                User.create("creator@test.com", passwordEncoder.encode("password123"), "작가", Role.CREATOR, ADULT));
         User otherCreator = userRepository.save(
-                User.create("other@test.com", passwordEncoder.encode("password123"), "다른작가", Role.CREATOR));
+                User.create("other@test.com", passwordEncoder.encode("password123"), "다른작가", Role.CREATOR, ADULT));
         User reader = userRepository.save(
-                User.create("reader@test.com", passwordEncoder.encode("password123"), "독자", Role.READER));
+                User.create("reader@test.com", passwordEncoder.encode("password123"), "독자", Role.READER, ADULT));
         creatorToken = jwtProvider.createAccessToken(creator.getId(), Role.CREATOR);
         otherCreatorToken = jwtProvider.createAccessToken(otherCreator.getId(), Role.CREATOR);
         readerToken = jwtProvider.createAccessToken(reader.getId(), Role.READER);
@@ -147,7 +150,7 @@ class EpisodeFlowTest {
         mockMvc.perform(get("/api/series/" + seriesId + "/episodes")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
 
         // 발행 시각이 지난 것처럼 스케줄러를 직접 호출 → PUBLISHED 전환
         episodeService.publishDueEpisodes(publishAt.plusSeconds(1));
@@ -155,7 +158,7 @@ class EpisodeFlowTest {
         mockMvc.perform(get("/api/series/" + seriesId + "/episodes")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].episodeNo").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].episodeNo").value(1));
     }
 }

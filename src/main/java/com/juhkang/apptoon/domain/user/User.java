@@ -1,5 +1,7 @@
 package com.juhkang.apptoon.domain.user;
 
+import java.time.LocalDate;
+
 import com.juhkang.apptoon.global.entity.BaseEntity;
 
 import jakarta.persistence.Column;
@@ -37,14 +39,23 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    private User(String email, String password, String nickname, Role role) {
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    private User(String email, String password, String nickname, Role role, LocalDate birthDate) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.role = role;
+        this.birthDate = birthDate;
     }
 
-    public static User create(String email, String password, String nickname, Role role) {
-        return new User(email, password, nickname, role);
+    public static User create(String email, String password, String nickname, Role role, LocalDate birthDate) {
+        return new User(email, password, nickname, role, birthDate);
+    }
+
+    /** 기준일(today)에 만 19세 이상이면 성인. 생년월일 미보유는 미성년으로 취급(보수적). */
+    public boolean isAdult(LocalDate today) {
+        return birthDate != null && !birthDate.isAfter(today.minusYears(19));
     }
 }

@@ -4,7 +4,7 @@ import com.juhkang.apptoon.domain.episode.EpisodeImage;
 
 public record EpisodeImageResponse(
         int sortOrder,
-        String path,
+        String url,
         int width,
         int height
 ) {

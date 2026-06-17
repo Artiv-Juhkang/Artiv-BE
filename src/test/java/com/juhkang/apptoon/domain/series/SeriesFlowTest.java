@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,8 @@ import com.juhkang.apptoon.domain.user.UserRepository;
 @Transactional
 class SeriesFlowTest {
 
+    private static final LocalDate ADULT = LocalDate.of(1990, 1, 1);
+
     @Autowired
     private MockMvc mockMvc;
     @Autowired
@@ -43,9 +47,9 @@ class SeriesFlowTest {
     @BeforeEach
     void setUp() {
         User creator = userRepository.save(
-                User.create("creator@test.com", passwordEncoder.encode("password123"), "작가", Role.CREATOR));
+                User.create("creator@test.com", passwordEncoder.encode("password123"), "작가", Role.CREATOR, ADULT));
         User reader = userRepository.save(
-                User.create("reader@test.com", passwordEncoder.encode("password123"), "독자", Role.READER));
+                User.create("reader@test.com", passwordEncoder.encode("password123"), "독자", Role.READER, ADULT));
         creatorToken = jwtProvider.createAccessToken(creator.getId(), Role.CREATOR);
         readerToken = jwtProvider.createAccessToken(reader.getId(), Role.READER);
     }

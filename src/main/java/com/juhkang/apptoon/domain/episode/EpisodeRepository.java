@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +17,7 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
 
     Optional<Episode> findBySeriesIdAndEpisodeNo(Long seriesId, int episodeNo);
 
-    List<Episode> findBySeriesIdAndStatusOrderByEpisodeNoAsc(Long seriesId, EpisodeStatus status);
+    Slice<Episode> findBySeriesIdAndStatusOrderByEpisodeNoAsc(Long seriesId, EpisodeStatus status, Pageable pageable);
 
     List<Episode> findByStatusAndPublishAtLessThanEqual(EpisodeStatus status, Instant time);
 }

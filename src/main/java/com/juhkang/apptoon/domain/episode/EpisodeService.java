@@ -1,16 +1,23 @@
 package com.juhkang.apptoon.domain.episode;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
+import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
+import com.juhkang.apptoon.domain.user.User;
+import com.juhkang.apptoon.domain.user.UserRepository;
+import com.juhkang.apptoon.global.dto.SliceResponse;
 import com.juhkang.apptoon.global.exception.BusinessException;
 import com.juhkang.apptoon.global.exception.ErrorCode;
 import com.juhkang.apptoon.global.storage.ImageStorageService;
@@ -25,6 +32,7 @@ public class EpisodeService {
     private final EpisodeRepository episodeRepository;
     private final EpisodeImageRepository episodeImageRepository;
     private final SeriesRepository seriesRepository;
+    private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
 
     @Transactional
@@ -58,17 +66,35 @@ public class EpisodeService {
                 .forEach(Episode::markPublished);
     }
 
-    public EpisodeDetailResponse getDetail(Long seriesId, int episodeNo) {
+    public SliceResponse<EpisodeSummaryResponse> getEpisodes(Long seriesId, Long viewerId, Pageable pageable) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        verifyAgeAccess(series, viewerId);
+        Slice<EpisodeSummaryResponse> slice = episodeRepository
+                .findBySeriesIdAndStatusOrderByEpisodeNoAsc(seriesId, EpisodeStatus.PUBLISHED, pageable)
+                .map(EpisodeSummaryResponse::of);
+        return SliceResponse.from(slice);
+    }
+
+    public EpisodeDetailResponse getDetail(Long seriesId, int episodeNo, Long viewerId) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        verifyAgeAccess(series, viewerId);
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
         List<EpisodeImage> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId());
         return EpisodeDetailResponse.of(episode, images);
     }
 
-    public List<EpisodeSummaryResponse> getPublishedList(Long seriesId) {
-        return episodeRepository.findBySeriesIdAndStatusOrderByEpisodeNoAsc(seriesId, EpisodeStatus.PUBLISHED)
-                .stream()
-                .map(EpisodeSummaryResponse::of)
-                .toList();
+    /** 19금(AGE_19) 작품은 만 19세 이상만 열람. 권한·소유권 검증은 Service에서(불변 규칙). */
+    private void verifyAgeAccess(Series series, Long viewerId) {
+        if (series.getAgeRating() != AgeRating.AGE_19) {
+            return;
+        }
+        User viewer = userRepository.findById(viewerId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!viewer.isAdult(LocalDate.now())) {
+            throw new BusinessException(ErrorCode.ADULT_ONLY);
+        }
     }
 }

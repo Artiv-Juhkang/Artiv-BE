@@ -41,7 +41,8 @@ public class AuthService {
                 request.email(),
                 passwordEncoder.encode(request.password()),
                 request.nickname(),
-                Role.READER
+                Role.READER,
+                request.birthDate()
         );
         return userRepository.save(user).getId();
     }
