@@ -431,6 +431,42 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 8 — 문서화(springdoc/OpenAPI) ✅ 완료 (커밋: `feat: STEP 8 ...`)
+
+### 목표
+실행 중인 컨트롤러에서 **OpenAPI 문서를 자동 생성**해 Swagger UI로 보고, `openapi.json`으로 프론트 타입 자동생성의 기반을 만든다.
+
+### ★ 반드시 알아야 할 핵심
+1. **이 스택이라 "버전부터" 검증.** 계획서가 *"springdoc은 호환 버전 확인 후 투입"*이라 적어둔 대로, 기억이 아니라 **Maven Central**로 확인 → springdoc **2.x는 Boot3용, 3.0.x가 Boot4용**(POM이 SB4 모듈명 `spring-boot-tomcat`·`spring-boot-health` 참조)임을 보고 `3.0.3` 채택. 최종 확인은 빌드+테스트. (우려와 달리 정상 동작)
+2. **문서 경로는 인증 예외로.** "전부 인증" 정책이라 `/v3/api-docs`·`/swagger-ui`를 `SecurityConfig`에서 `permitAll` 안 하면 문서도 401로 못 본다.
+3. **자동 생성 = 코드가 진실.** 컨트롤러/DTO를 스캔해 문서를 만들어 코드-문서 불일치가 없다. JWT 보안 스킴(`bearerAuth`)을 `OpenAPI` 빈에 등록 → Swagger에서 토큰 넣고 호출 가능.
+4. **설정성 작업도 자동 검증.** TDD처럼 "`GET /v3/api-docs` 200 + 주요 경로 포함" 통합 테스트로 문서 생성 자체를 회귀 보호.
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `build.gradle` | `springdoc-openapi-starter-webmvc-ui:3.0.3` (SB4.1 호환) |
+| `SecurityConfig` | `/v3/api-docs/**`·`/swagger-ui/**` permitAll |
+| `OpenApiConfig` | `OpenAPI` 빈(title/version + JWT bearer 스킴) |
+| `OpenApiDocsTest` | 문서 생성·주요 경로 포함 검증 |
+
+### 검증
+- `./gradlew test` → **33개 전부 통과**(신규 `OpenApiDocsTest` 1 + 기존 32). `/v3/api-docs` 200 + `openapi`/`info.title` 필드 + `/api/series`·`/api/auth/signup` 경로 포함.
+- (수동) `bootRun` 후 `/swagger-ui/index.html`에서 전체 API 열람·호출 가능.
+
+### 오류/특이사항
+- **호환성 결론:** 우려와 달리 springdoc **3.0.3이 SB4.1과 정상 동작**(빌드·테스트 통과). "옛 버전(2.x)은 Boot3용"이라는 스택 함정만 피하면 됨 — `start.md`가 STEP 8로 미뤄둔 이유가 바로 이 검증.
+- 설정 위주라 RED는 "문서 경로 부재 시 인증 실패(401)" → 의존성+permit+빈 추가 후 GREEN.
+
+### 키워드
+- **OpenAPI / Swagger:** REST API를 기계가 읽는 규격(JSON)으로 기술. Swagger UI는 그 문서를 사람이 보는 화면.
+- **springdoc:** 런타임에 컨트롤러를 스캔해 OpenAPI 문서를 자동 생성하는 라이브러리.
+- **`/v3/api-docs`:** 생성된 OpenAPI JSON 엔드포인트(프론트 타입 생성의 입력).
+- **보안 스킴(securityScheme):** 문서에 인증 방식(JWT Bearer)을 기술 → Swagger에서 토큰 넣고 호출.
+- **코드-우선 문서화:** 코드에서 문서를 뽑아 수기 문서 대비 불일치 제거.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
