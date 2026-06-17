@@ -302,6 +302,50 @@ DB가 붙고, 인증 없이 헬스체크가 되는 빈 서버를 띄운다. = "�
 
 ---
 
+## STEP 5 — 뷰어 조회 API(무한스크롤·19금 가드) ✅ 완료 (커밋: `feat: STEP 5 ...`)
+
+### 목표
+독자가 작품의 **발행 회차를 무한스크롤(`Slice`)로** 넘겨보고, 회차 상세에서 이미지를 **순서·url·크기**와 함께 받는다. **19금(AGE_19)** 작품은 만 19세 이상만 열람한다.
+
+### ★ 반드시 알아야 할 핵심
+1. **19금 가드는 "데이터"가 먼저다.** `User`에 나이 정보가 없어 실제 성인 검증이 불가능했다 → `birthDate`(생년월일)를 추가(`V5`)하고 회원가입(`signup`)에서 받는다. 가드는 `User.isAdult(today)`(만 19세 이상)로 판정. **권한·소유권 검증은 Service**(불변 규칙)라 `EpisodeService`에서 `AgeRating==AGE_19`일 때만 뷰어를 조회해 검사, 미성년이면 `ADULT_ONLY`(403).
+2. **무한스크롤은 `Page`가 아니라 `Slice`.** 전체 개수(`count` 쿼리) 없이 `hasNext`만 필요 → `Slice<Episode>` + `Pageable`. 공통 `SliceResponse{content, page, size, hasNext}`로 감싸 응답(전체 카운트 쿼리 비용 회피).
+3. **응답 필드는 계약이다.** STEP 4의 목록 응답을 단순 `List`→`Slice` 형태로 바꾸면 프론트가 보던 JSON 모양(`[...]`→`{content:[...]}`)이 달라진다. 기존 테스트의 `$.length()`·`$[0]`도 `$.content.length()`·`$.content[0]`로 함께 수정(계약 변경의 파급).
+4. **시그니처 변경의 파급.** `User.create`에 `birthDate`를 필수로 넣으니 호출부 6곳(테스트 5 + `AuthService`)이 전부 바뀐다. 내 변경으로 깨진 곳만 최소 수정(테스트엔 성인 기준일 상수 주입).
+5. **이미지 서빙은 여전히 보류.** 상세의 `url`은 저장된 **상대 경로**를 그대로 노출(프론트가 base URL 결합). 정적 서빙은 보안설정/연령 직링크 이슈가 있어 후속.
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `User`(+`birthDate`, `isAdult`), `V5` | 생년월일 컬럼(레거시 NULL=미성년 취급) + 만 19세 판정 |
+| `SignupRequest`/`AuthService` | 가입 시 `@NotNull @Past birthDate` 수집·저장 |
+| `EpisodeRepository` | 목록을 `Slice<Episode> ...(Pageable)`로 변경 |
+| `EpisodeService` | `getEpisodes`(Slice+가드), `getDetail`(가드), `verifyAgeAccess` |
+| `SliceResponse<T>` | 무한스크롤 공통 응답(content/page/size/hasNext) |
+| `EpisodeImageResponse` | `path` → `url` 노출명 변경 |
+| `EpisodeController` | 목록/상세에 `@AuthenticationPrincipal`·`Pageable` 주입 |
+| `ErrorCode` | `ADULT_ONLY`(403) 추가 |
+
+### 검증
+- `./gradlew test` → **26개 전부 통과**(신규 `EpisodeViewerTest` 4 + `AuthServiceTest` 생년월일 1 + 기존).
+  - `size=2`로 회차 3개 중 2개 + `hasNext=true`(무한스크롤)
+  - 상세에서 이미지 `url`·`width`·`height` 동반
+  - 미성년 토큰 → 19금 목록/상세 **403 `ADULT_ONLY`**, 성인 토큰 → **200**
+
+### 오류/특이사항
+- **설계 막힘 → 데이터 모델 확장으로 해결.** "19금 가드"가 `User`에 나이가 없어 불가능 → 임의 가정 대신 *생년월일 추가(정석)*을 선택해 진행(STEP 2 일부 동반 수정).
+- **TDD.** signup 생년월일 저장(컴파일 RED) → 구현, 뷰어 Slice/url/가드(행위적 RED, 단 "성인 200"은 가드 전에도 통과하는 회귀 보호 테스트) → 구현.
+- **`Slice` vs `Page`:** `Slice`는 `count` 쿼리를 날리지 않아 다음 페이지 유무만 알면 되는 무한스크롤에 적합.
+
+### 키워드
+- **`Slice`/`Page`:** `Page`=전체 개수 포함(추가 count 쿼리), `Slice`=`hasNext`만(무한스크롤용, 더 가벼움).
+- **만 나이 가드:** `birthDate <= 기준일 − 19년` 이면 성인. 생년월일 없으면 보수적으로 미성년.
+- **`@AuthenticationPrincipal`:** 현재 요청자(userId) 주입 → 연령 가드에서 조회자 식별.
+- **계약(Contract) 변경:** 응답 JSON 모양이 바뀌면 그 모양에 의존하던 테스트/프론트도 함께 바뀌어야 함.
+- **`@Past`/`@NotNull`(검증):** 생년월일은 과거 날짜 + 필수.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
