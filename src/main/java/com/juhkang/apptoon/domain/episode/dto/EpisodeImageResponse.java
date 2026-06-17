@@ -10,6 +10,6 @@ public record EpisodeImageResponse(
 ) {
 
     public static EpisodeImageResponse of(EpisodeImage image) {
-        return new EpisodeImageResponse(image.getSortOrder(), image.getPath(), image.getWidth(), image.getHeight());
+        return new EpisodeImageResponse(image.getSortOrder(), "/files/" + image.getPath(), image.getWidth(), image.getHeight());
     }
 }

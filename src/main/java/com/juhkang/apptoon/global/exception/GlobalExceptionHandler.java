@@ -7,6 +7,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.juhkang.apptoon.global.exception.ErrorResponse.FieldErrorDetail;
 
@@ -38,6 +39,13 @@ public class GlobalExceptionHandler {
         log.warn("AccessDenied: {}", e.getMessage());
         return ResponseEntity.status(ErrorCode.FORBIDDEN.getStatus())
                 .body(ErrorResponse.of(ErrorCode.FORBIDDEN));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e) {
+        log.warn("No static resource: {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.ENTITY_NOT_FOUND.getStatus())
+                .body(ErrorResponse.of(ErrorCode.ENTITY_NOT_FOUND));
     }
 
     @ExceptionHandler(Exception.class)
