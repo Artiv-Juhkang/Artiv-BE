@@ -21,6 +21,10 @@ spring:
 server:
   port: 8080
 
+app:
+  storage:
+    root: ${STORAGE_ROOT:storage}      # 업로드 이미지 저장 루트(로컬). 운영은 환경변수로 덮어씀.
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-validity: 3600000        # 1시간 (ms)
