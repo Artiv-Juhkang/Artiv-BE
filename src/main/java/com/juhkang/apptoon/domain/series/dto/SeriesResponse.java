@@ -29,7 +29,7 @@ public record SeriesResponse(
                 series.getAuthor().getNickname(),
                 series.getAgeRating(),
                 series.getStatus(),
-                series.getPublishDays(),
+                Set.copyOf(series.getPublishDays()), // LAZY 컬렉션을 트랜잭션 안에서 즉시 복사(세션밖 직렬화 방지)
                 series.isVisible(),
                 series.isAdultOnly(),
                 series.getCreatedAt()
