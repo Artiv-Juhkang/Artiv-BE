@@ -565,6 +565,47 @@ STEP 4·5에서 **보류**했던 이미지 서빙을 닫는다. 저장만 하고
 
 ---
 
+## STEP 11 — 프론트 효율: 작가 본인작·제목검색·상세집계 ✅ 완료 (커밋: `feat: STEP 11-1/11-2/11-3 ...`)
+
+### 목표
+프론트가 화면을 **적은 요청으로** 그릴 수 있게 세 가지를 보강한다 — (11-1) 제목 **검색**, (11-2) 작가 자기작 목록 `GET /api/series/mine`(비공개 포함), (11-3) 작품 상세에 **발행회차수·최신회차번호·구독여부** 동봉. 모두 기존 인프라(`search` 동적 필터, `existsByUserIdAndSeriesId`, 배치 집계 패턴) 재사용.
+
+### ★ 반드시 알아야 할 핵심
+1. **null 파라미터 like 검색은 `cast(:keyword as string)` 필수.** `search`에 `and (:keyword is null or lower(s.title) like lower(concat('%', :keyword, '%')))`를 넣었더니 keyword=null인 기존 호출이 **500**(`function lower(bytea) does not exist`) — Hibernate가 null 파라미터 타입을 못 정해 PostgreSQL이 `bytea`로 추론한 탓. `cast(:keyword as string)`로 타입을 명시해 해결. **동적 필터에 null+문자열 함수를 쓰면 캐스팅으로 타입을 고정**.
+2. **구체 경로가 경로변수보다 우선 — `/api/series/mine`은 `/{id}`와 충돌 안 함.** Spring은 정확 매칭(`/mine`)을 패턴(`/{id}`)보다 우선 라우팅하므로 별도 컨트롤러 없이 `SeriesController`에 둔다. 작가 자기작은 **visible 무관(hidden 포함)** 조회 → `SeriesSummaryResponse`에 `visible` 추가해 공개여부 구분(공개 목록엔 항상 true라 무해). 권한 게이트 없이 `@AuthenticationPrincipal`로 자기 author 작품만 보므로 안전(타인은 빈 목록).
+3. **뷰어 맥락 응답은 전용 DTO로 분리.** 상세의 `episodeCount`·`latestEpisodeNo`·`isSubscribed`는 admin 변경 응답(`SeriesResponse`)엔 무의미하므로 **`SeriesDetailResponse`를 신설**(SeriesResponse는 admin·공통용 유지). `latestEpisodeNo`는 **PUBLISHED 기준 max**(예약분 제외) — `findMaxEpisodeNoBySeriesIdAndStatus`. `isSubscribed`는 `existsByUserIdAndSeriesId` 재사용.
+4. **상세 1요청 = cross-domain 조합.** 작품 상세에 episode 집계 + subscription 여부를 합치려고 `SeriesService`가 `EpisodeRepository`·`SubscriptionRepository`를 참조한다. 이는 series↔episode·series↔personalization **패키지 상호참조**를 만든다(트레이드오프). 프론트 1요청 효율을 위해 수용했고, graphify로 결합 신호를 모니터링한다. 진짜 문제화되면 조합을 컨트롤러/BFF 계층으로 올린다.
+
+### 작업 내역
+| 단계 | 파일 | 한 일 |
+|---|---|---|
+| 11-1 | `SeriesRepository.search`(+keyword·cast), `SeriesService.getList`, `SeriesController.list` | 제목 ILIKE 검색 |
+| 11-2 | `SeriesRepository.findByAuthorId`, `SeriesService.getMySeries`, `SeriesController`(/mine), `SeriesSummaryResponse`(+visible) | 작가 자기작(hidden 포함) 목록 |
+| 11-3 | `SeriesDetailResponse`(신규), `EpisodeRepository`(countBy·maxByStatus), `SeriesService.getDetail`(집계 조합), `SeriesController.detail`(반환타입) | 상세에 회차수·최신회차·구독여부 |
+| 테스트 | `MySeriesTest`(2), `SeriesDetailTest`(2), `SeriesFlowTest`(검색 1) | 검색·자기작·집계 검증 |
+
+### 검증
+- `./gradlew test` → **48개 전부 통과**(STEP 10 후 43 → 검색 1 → mine 2 → detail 2 = 48).
+  - `?keyword=로맨스` → 제목 매칭 1건, `무협` → 0건
+  - `/api/series/mine`: 작가는 공개+비공개 2건(visible 구분), 타인은 0건
+  - 상세: 발행 2화+예약 1화 → `episodeCount=2`·`latestEpisodeNo=2`, 구독자 `isSubscribed=true`/비구독자 false
+- **RED→GREEN×3.** 각 하위단계 실패 테스트 먼저(검색 미반영 2건 반환, /mine 404, 집계필드 부재) → 구현.
+
+### 오류/특이사항
+- **`lower(bytea)` 회귀 즉시 수정.** 11-1에서 내 변경이 기존 목록 조회를 500으로 깨뜨림 → `cast(:keyword as string)`로 해결(systematic-debugging: 가설→`lower(bytea) does not exist` 증거→캐스팅).
+- **(트레이드오프) 패키지 상호참조 발생.** `SeriesService`→`EpisodeRepository`·`SubscriptionRepository`로 series↔episode·series↔personalization 양방향 의존. 단순성·1요청 효율 우선해 수용, graphify로 추적.
+- **(의도적 범위 한계) 비로그인 브라우징 미오픈.** `/api/series/**`는 여전히 `authenticated()` → viewerId non-null 유지, STEP 10 보류분(`findById(null)` 가드)도 계속 보류. 비로그인 탐색을 열 때 함께 처리.
+- **정렬(sort)은 STEP 12로.** ToDoList의 '정렬'은 adultOnly와 함께 STEP 12에서 구현(검색·필터까지가 STEP 11 범위).
+
+### 키워드
+- **동적 검색 필터 `:param is null or ...`:** 파라미터 없으면 전체, 있으면 조건. null+문자열 함수는 `cast(:param as string)`로 타입 고정.
+- **ILIKE(대소문자 무시 검색):** JPQL엔 ILIKE 없어 `lower(title) like lower(...)`로 구현(한글은 대소문자 무관).
+- **경로 매칭 우선순위:** 구체 경로(`/mine`)가 경로변수(`/{id}`)보다 먼저 — 별도 컨트롤러 불필요.
+- **뷰어 맥락 DTO:** 같은 엔티티라도 화면 맥락(상세 vs 변경응답)이 다르면 DTO를 분리(`SeriesDetailResponse` vs `SeriesResponse`).
+- **cross-domain 조합:** 한 응답에 여러 도메인 데이터를 합칠 때의 결합 트레이드오프 — 서비스 직접참조(단순) vs 상위 계층 조합(결합↓).
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
