@@ -507,6 +507,64 @@ STEP 4·5에서 **보류**했던 이미지 서빙을 닫는다. 저장만 하고
 
 ---
 
+## STEP 10 — Entity-DTO 명확화 + 상세 가드 ✅ 완료 (커밋: `feat: STEP 10-1/10-2 ...`)
+
+### 목표
+재설계 워크플로 결론에 따라 **(1) Entity↔DTO 관계를 명확히** 하고(누락 필드·약타입 보강 + 매핑 명세), **(2) 목록에서 빠진 비공개·미발행 콘텐츠가 ID 직접접근으로 노출되던 계약 구멍을 닫는다**(상세 가드). 프론트가 의존하는 응답 계약을 정합하게 만든다.
+
+### ★ 반드시 알아야 할 핵심
+1. **누락 필드는 "관리자 기능의 의미 구멍"이었다.** `Series.visible`이 `SeriesResponse`에 없어, 관리자가 공개/비공개를 바꿔도(`AdminService.changeSeriesVisibility`) 응답에 결과가 안 드러났다 → `visible` 추가로 변경 결과를 응답에 노출.
+2. **생성 응답을 `Map.of` → record로.** `Map.of("id", n)`/`Map.of("episodeNo", n)`는 JSON은 같아도 OpenAPI에 **명명 스키마가 안 생겨** 프론트 타입 자동생성이 부실해진다 → `IdResponse(Long id)`(범용·global/dto), `EpisodeNoResponse(int episodeNo)`(episode/dto) record로 교체. **JSON 계약 동일이라 회귀 0**(리팩토링).
+3. **민감정보는 단순성과 프라이버시 둘 다로 미노출.** `birthDate`를 공용 `UserResponse`에 넣으면 `/me`뿐 아니라 `AdminService.changeUserRole`도 같은 DTO라 **관리자가 타인 생년월일을 보게 된다** → 비노출 유지 + 의도 주석. 본인 프로필 표시가 필요해지면 `/me` 전용 응답으로 분리(YAGNI).
+4. **목록-상세 계약 일치 = 가드는 Service에서.** 목록(`search`)은 `visible=true`만, 회차 목록은 `PUBLISHED`만 보여주는데, **상세 by-id는 그 필터를 우회**해 비공개 작품·예약(SCHEDULED) 회차가 직접조회로 노출됐다 → `getDetail`에 가드 추가(불변 규칙: 권한·소유권 검증은 Service). **비공개/미발행은 "존재를 숨겨" 404(403 아님)** — 정보 누출 최소화.
+5. **프리뷰 주체 = 작가 본인 + ADMIN.** 비공개/미발행도 작가 본인(`series.isAuthoredBy(viewerId)`)·ADMIN은 프리뷰 허용. ADMIN 판정은 컨트롤러에서 `Authentication`의 `ROLE_ADMIN` 권한을 추출해 Service에 boolean으로 전달(principal=userId는 role을 모르므로). 이 정책 변경으로 STEP 4의 "독자도 예약 회차 상세 조회 가능"이 **작가 프리뷰로 교체**됨(EpisodeFlowTest 수정).
+
+### Entity → DTO 매핑표 (사용자 요구: "관계를 명확히 구분")
+| 엔티티 | 테이블 | 응답 DTO | 요청 DTO | 노출 정책 |
+|---|---|---|---|---|
+| `User` | users | `UserResponse`(id·email·nickname·role) | `SignupRequest`·`LoginRequest` | **password·birthDate 미노출**(민감) |
+| `RefreshToken` | refresh_tokens | — (내부 전용) | — | 토큰은 `TokenResponse`로만 |
+| `Series` | series | `SeriesResponse`(+**visible**), `SeriesSummaryResponse` | `SeriesCreateRequest` | 목록 요약엔 publishDays 제외(N+1 회피) |
+| `Episode` | episodes | `EpisodeDetailResponse`, `EpisodeSummaryResponse` | 멀티파트 폼(title·publishAt·images) | 생성 응답 `EpisodeNoResponse` |
+| `EpisodeImage` | episode_images | `EpisodeImageResponse`(detail에 중첩) | — | path→**url**(`/files/` 변환, STEP 9) |
+| `Subscription` | subscriptions | `SubscriptionResponse`(집계 조합) | — | of() 없이 Service 조합(3집계값) |
+| `ReadLog` | read_logs | — (내부 전용) | — | 읽음/UP 계산 입력 |
+| (생성 공통) | — | **`IdResponse`**, **`EpisodeNoResponse`** | — | Map.of 대체 |
+
+**DTO 규약(이번에 명문화):** ① 엔티티 직접 노출 금지, `of(entity)` 정적 팩토리로 매핑 캡슐화(집계 조합형은 `of(entity, 집계인자)` 허용). ② 단일 도메인 전용 요청/응답은 `domain/{x}/dto`, 여러 도메인 공유 범용 래퍼(`PageResponse`/`SliceResponse`/`IdResponse`)만 `global/dto`. ③ 민감값(password·birthDate)은 응답 화이트리스트에서 제외. ④ 엔티티명-필드명은 의미가 같으면 동일 명명, 의도적 변환(path→url)은 변환 로직을 `of()`에 둔다.
+
+### 작업 내역
+| 단계 | 파일 | 한 일 |
+|---|---|---|
+| 10-1 | `SeriesResponse`(+visible), `IdResponse`(신규), `EpisodeNoResponse`(신규), `Series/EpisodeController` | visible 매핑 + 생성응답 record화 |
+| 10-1 | `UserResponse` | birthDate 비노출 의도 주석 |
+| 10-2 | `Series.isAuthoredBy(userId)` | 작가 본인 판정 도메인 메서드 |
+| 10-2 | `SeriesService.getDetail`, `EpisodeService.getDetail/getEpisodes`(+`verifyVisibleAccess`) | 비공개·미발행 가드(작가/ADMIN 프리뷰) |
+| 10-2 | `Series/EpisodeController` | `Authentication`에서 ROLE_ADMIN 추출 전달 |
+| 테스트 | `SeriesResponseTest`(신규), `ViewerGuardTest`(신규 6), `AdminFlowTest`·`SeriesFlowTest`·`EpisodeFlowTest`(보강/정책수정) | visible 매핑·가드·프리뷰 검증 |
+
+### 검증
+- `./gradlew test` → **43개 전부 통과**(10-1 후 37, 10-2 후 +`ViewerGuardTest` 6 = 43).
+  - 비공개 작품 상세/회차목록: 타인 **404**, 작가 본인·ADMIN **200**
+  - 미발행(SCHEDULED) 회차 상세: 타인 **404**, 작가 본인 **200**(status=SCHEDULED 프리뷰)
+  - 관리자 비공개 처리 응답에 `visible=false` 노출
+- **RED→GREEN.** 10-1은 `visible()` 부재 컴파일 RED, 10-2는 타인 직접조회가 200→404로 바뀌는 행위적 RED 4건 확인 후 구현.
+
+### 오류/특이사항
+- **STEP 4 정책 교체 명시.** STEP 4 노트의 "독자가 SCHEDULED 상세 조회 가능"을 **작가 프리뷰로 교체** — `EpisodeFlowTest`의 해당 단언을 creator 토큰(200)+reader(404)로 수정. 임의 변경이 아니라 "목록-상세 계약 일치"라는 사용자 요구(프론트 효율) 반영.
+- **(의도적 범위 한계) 비로그인 `viewerId=null` 가드는 추가하지 않음.** `SecurityConfig`상 `/api/series/**`는 `authenticated()` 필수(permitAll은 health·auth·files·swagger뿐)라 viewerId는 **항상 non-null** → `verifyAgeAccess`의 `findById(null)` 경로는 현재 도달 불가능. CLAUDE.md "발생 불가능 시나리오 예외처리 금지(YAGNI)"에 따라 보류. **STEP 11에서 비로그인 브라우징(`/api/series` permitAll)을 열면 그때 가드 추가 필요.**
+- **ADMIN 판정 중복.** `hasAdminRole(Authentication)`이 Series/Episode 컨트롤러 2곳에 복제됨. 3번째가 생기면 공통 유틸로 추출(YAGNI, 현재는 복제 유지).
+- **CLAUDE.md 미수정.** 계획의 "CLAUDE.md에 DTO 규약 한 줄"은 CLAUDE.md가 사용자 소유 행동지침 파일이라 임의 수정하지 않고, 도메인 규약은 본 학습노트에 명문화.
+
+### 키워드
+- **목록-상세 계약 일치:** 목록 필터(visible/PUBLISHED)와 상세 by-id 접근 정책을 같게 — 한쪽만 막으면 우회 노출.
+- **존재 숨김 404 vs 403:** 비공개 리소스는 "없는 것처럼" 404로 응답해 존재 자체를 숨김(403은 "있지만 권한 없음"이라 존재가 드러남).
+- **프리뷰(preview):** 발행/공개 전 콘텐츠를 작성자·관리자가 미리 보는 것. 일반 사용자에겐 404.
+- **`Authentication.getAuthorities()`:** 현재 인증 주체의 권한(`ROLE_*`) 목록. principal(userId)과 별개로 역할 판정에 사용.
+- **record 리팩토링:** 약타입(`Map`) 응답을 명명 record로 — JSON은 같아도 OpenAPI 스키마·타입 안정성 확보.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
