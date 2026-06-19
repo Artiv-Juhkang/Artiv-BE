@@ -1,7 +1,6 @@
 package com.juhkang.apptoon.domain.series;
 
 import java.time.DayOfWeek;
-import java.util.Map;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
+import com.juhkang.apptoon.global.dto.IdResponse;
 import com.juhkang.apptoon.global.dto.PageResponse;
 
 import jakarta.validation.Valid;
@@ -35,9 +35,9 @@ public class SeriesController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CREATOR')")
-    public Map<String, Long> create(@AuthenticationPrincipal Long userId,
-                                    @Valid @RequestBody SeriesCreateRequest request) {
-        return Map.of("id", seriesService.create(userId, request));
+    public IdResponse create(@AuthenticationPrincipal Long userId,
+                             @Valid @RequestBody SeriesCreateRequest request) {
+        return new IdResponse(seriesService.create(userId, request));
     }
 
     @GetMapping

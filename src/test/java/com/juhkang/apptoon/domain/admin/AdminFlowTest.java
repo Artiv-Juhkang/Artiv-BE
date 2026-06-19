@@ -119,7 +119,8 @@ class AdminFlowTest {
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"visible\":false}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(false));
 
         mockMvc.perform(get("/api/series").param("day", "MONDAY")
                         .header("Authorization", "Bearer " + readerToken))

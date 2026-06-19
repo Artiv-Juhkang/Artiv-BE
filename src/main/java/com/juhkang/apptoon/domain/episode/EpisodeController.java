@@ -2,7 +2,6 @@ package com.juhkang.apptoon.domain.episode;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
+import com.juhkang.apptoon.domain.episode.dto.EpisodeNoResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.apptoon.global.dto.SliceResponse;
 
@@ -35,12 +35,12 @@ public class EpisodeController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CREATOR')")
-    public Map<String, Integer> upload(@AuthenticationPrincipal Long userId,
-                                       @PathVariable Long seriesId,
-                                       @RequestParam String title,
-                                       @RequestParam(required = false) Instant publishAt,
-                                       @RequestPart("images") List<MultipartFile> images) {
-        return Map.of("episodeNo", episodeService.upload(userId, seriesId, title, publishAt, images));
+    public EpisodeNoResponse upload(@AuthenticationPrincipal Long userId,
+                                    @PathVariable Long seriesId,
+                                    @RequestParam String title,
+                                    @RequestParam(required = false) Instant publishAt,
+                                    @RequestPart("images") List<MultipartFile> images) {
+        return new EpisodeNoResponse(episodeService.upload(userId, seriesId, title, publishAt, images));
     }
 
     @GetMapping("/{episodeNo}")
