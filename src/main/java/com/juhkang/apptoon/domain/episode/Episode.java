@@ -47,6 +47,9 @@ public class Episode extends BaseEntity {
     @Column(name = "publish_at")
     private Instant publishAt;
 
+    @Column(name = "view_count", nullable = false)
+    private long viewCount = 0;
+
     private Episode(Series series, int episodeNo, String title, EpisodeStatus status, Instant publishAt) {
         this.series = series;
         this.episodeNo = episodeNo;
@@ -61,5 +64,9 @@ public class Episode extends BaseEntity {
 
     public void markPublished() {
         this.status = EpisodeStatus.PUBLISHED;
+    }
+
+    public void increaseViewCount() {
+        this.viewCount++;
     }
 }

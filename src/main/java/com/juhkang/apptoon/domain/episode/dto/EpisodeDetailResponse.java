@@ -13,6 +13,7 @@ public record EpisodeDetailResponse(
         EpisodeStatus status,
         Instant publishAt,
         List<EpisodeImageResponse> images,
+        long viewCount,
         long likeCount,
         boolean liked
 ) {
@@ -24,6 +25,7 @@ public record EpisodeDetailResponse(
                 episode.getStatus(),
                 episode.getPublishAt(),
                 images.stream().map(EpisodeImageResponse::of).toList(),
+                episode.getViewCount(),
                 likeCount,
                 liked
         );

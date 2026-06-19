@@ -79,6 +79,7 @@ public class EpisodeService {
         return SliceResponse.from(slice);
     }
 
+    @Transactional
     public EpisodeDetailResponse getDetail(Long seriesId, int episodeNo, Long viewerId, boolean isAdmin) {
         Series series = seriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
@@ -93,6 +94,7 @@ public class EpisodeService {
         if (episode.getStatus() != EpisodeStatus.PUBLISHED && !canPreview) {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
+        episode.increaseViewCount(); // 더티 체킹으로 트랜잭션 종료 시 UPDATE
         List<EpisodeImage> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId());
         long likeCount = episodeLikeRepository.countByEpisodeId(episode.getId());
         boolean liked = episodeLikeRepository.existsByUserIdAndEpisodeId(viewerId, episode.getId());
