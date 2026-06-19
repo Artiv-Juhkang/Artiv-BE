@@ -9,7 +9,7 @@ public record EpisodeImageResponse(
         int height
 ) {
 
-    public static EpisodeImageResponse of(EpisodeImage image) {
-        return new EpisodeImageResponse(image.getSortOrder(), "/files/" + image.getPath(), image.getWidth(), image.getHeight());
+    public static EpisodeImageResponse of(EpisodeImage image, String url) {
+        return new EpisodeImageResponse(image.getSortOrder(), url, image.getWidth(), image.getHeight());
     }
 }

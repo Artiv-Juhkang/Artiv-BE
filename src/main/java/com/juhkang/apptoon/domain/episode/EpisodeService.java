@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
+import com.juhkang.apptoon.domain.episode.dto.EpisodeImageResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Series;
@@ -95,7 +96,9 @@ public class EpisodeService {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
         episode.increaseViewCount(); // 더티 체킹으로 트랜잭션 종료 시 UPDATE
-        List<EpisodeImage> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId());
+        List<EpisodeImageResponse> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId()).stream()
+                .map(image -> EpisodeImageResponse.of(image, imageStorageService.urlFor(image.getPath())))
+                .toList();
         long likeCount = episodeLikeRepository.countByEpisodeId(episode.getId());
         boolean liked = episodeLikeRepository.existsByUserIdAndEpisodeId(viewerId, episode.getId());
         return EpisodeDetailResponse.of(episode, images, likeCount, liked);
