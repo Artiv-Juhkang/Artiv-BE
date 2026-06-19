@@ -142,11 +142,15 @@ class EpisodeFlowTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.episodeNo").value(1));
 
-        // 예약 상태: 상세는 SCHEDULED, 발행 목록에는 아직 안 보임
+        // 예약 상태: 작가 본인은 프리뷰로 상세(SCHEDULED) 조회 가능, 발행 목록에는 아직 안 보임
         mockMvc.perform(get("/api/series/" + seriesId + "/episodes/1")
-                        .header("Authorization", "Bearer " + readerToken))
+                        .header("Authorization", "Bearer " + creatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SCHEDULED"));
+        // 독자는 미발행 회차를 직접조회할 수 없다(404)
+        mockMvc.perform(get("/api/series/" + seriesId + "/episodes/1")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/series/" + seriesId + "/episodes")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())

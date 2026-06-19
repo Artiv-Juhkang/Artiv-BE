@@ -83,4 +83,9 @@ public class Series extends BaseEntity {
     public void changeVisibility(boolean visible) {
         this.visible = visible;
     }
+
+    /** 이 작품의 작가 본인인지. 비공개·미발행 프리뷰 권한 판정에 사용. */
+    public boolean isAuthoredBy(Long userId) {
+        return author.getId().equals(userId);
+    }
 }

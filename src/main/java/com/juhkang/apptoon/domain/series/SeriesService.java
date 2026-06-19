@@ -47,9 +47,13 @@ public class SeriesService {
         return PageResponse.from(page);
     }
 
-    public SeriesResponse getDetail(Long id) {
+    public SeriesResponse getDetail(Long id, Long viewerId, boolean isAdmin) {
         Series series = seriesRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        // 비공개 작품은 작가 본인·ADMIN만 프리뷰, 그 외에는 존재를 숨겨 404
+        if (!series.isVisible() && !(isAdmin || series.isAuthoredBy(viewerId))) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
         return SeriesResponse.of(series);
     }
 }

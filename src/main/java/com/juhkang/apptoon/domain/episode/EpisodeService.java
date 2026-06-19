@@ -66,9 +66,11 @@ public class EpisodeService {
                 .forEach(Episode::markPublished);
     }
 
-    public SliceResponse<EpisodeSummaryResponse> getEpisodes(Long seriesId, Long viewerId, Pageable pageable) {
+    public SliceResponse<EpisodeSummaryResponse> getEpisodes(Long seriesId, Long viewerId, boolean isAdmin,
+                                                             Pageable pageable) {
         Series series = seriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        verifyVisibleAccess(series, viewerId, isAdmin);
         verifyAgeAccess(series, viewerId);
         Slice<EpisodeSummaryResponse> slice = episodeRepository
                 .findBySeriesIdAndStatusOrderByEpisodeNoAsc(seriesId, EpisodeStatus.PUBLISHED, pageable)
@@ -76,14 +78,29 @@ public class EpisodeService {
         return SliceResponse.from(slice);
     }
 
-    public EpisodeDetailResponse getDetail(Long seriesId, int episodeNo, Long viewerId) {
+    public EpisodeDetailResponse getDetail(Long seriesId, int episodeNo, Long viewerId, boolean isAdmin) {
         Series series = seriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        boolean canPreview = isAdmin || series.isAuthoredBy(viewerId);
+        if (!series.isVisible() && !canPreview) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
         verifyAgeAccess(series, viewerId);
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        // 미발행(SCHEDULED/DRAFT) 회차는 작가 본인·ADMIN만 프리뷰, 그 외에는 404
+        if (episode.getStatus() != EpisodeStatus.PUBLISHED && !canPreview) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
         List<EpisodeImage> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId());
         return EpisodeDetailResponse.of(episode, images);
+    }
+
+    /** 비공개 작품은 작가 본인·ADMIN만 접근, 그 외에는 존재를 숨겨 404. */
+    private void verifyVisibleAccess(Series series, Long viewerId, boolean isAdmin) {
+        if (!series.isVisible() && !(isAdmin || series.isAuthoredBy(viewerId))) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
     }
 
     /** 19금(AGE_19) 작품은 만 19세 이상만 열람. 권한·소유권 검증은 Service에서(불변 규칙). */
