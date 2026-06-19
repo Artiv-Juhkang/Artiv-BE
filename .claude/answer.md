@@ -750,6 +750,45 @@ ToDoList 원문 *"19태그가 붙은 웹툰 중 성인 웹툰이 따로 있고, 
 
 ---
 
+## STEP 16 — 이미지 S3 호환 스토리지 전환 ✅ 완료 (커밋: `refactor/feat: ObjectStorage ...`)
+
+### 목표
+로컬 디스크에만 저장하던 회차 이미지를, **코드 변경 없이 환경변수만으로 S3 호환 스토리지(MinIO/R2/AWS S3)로 전환**할 수 있게 한다. 컨테이너 배포 시 디스크가 휘발되는 문제(STEP 9 정적 서빙의 운영 한계)를 닫는 배포 선결과제.
+
+### ★ 반드시 알아야 할 핵심
+1. **저장 백엔드를 `ObjectStorage` 인터페이스로 추상화.** `put(key, bytes, contentType)` + `urlFor(key)` 두 메서드. `ImageStorageService`는 검증·리사이즈만 하고 저장은 ObjectStorage에 위임 → 구현 교체만으로 백엔드 전환. (16-1은 동작 동일 리팩토링: `/files` URL 유지, 68개 그대로 통과.)
+2. **AWS SDK v2 S3Client가 벤더 호환의 핵심.** `endpointOverride`로 endpoint만 바꾸면 **MinIO·Cloudflare R2·AWS S3 모두 같은 코드**로 붙는다. `forcePathStyle(true)`는 MinIO/R2의 path-style 접근에 필요. 의존성은 BOM으로 버전 관리(`software.amazon.awssdk:bom` + `s3`).
+3. **구현 선택은 `@ConditionalOnProperty`.** `app.storage.type=local`(기본, `matchIfMissing`) → `LocalObjectStorage`, `=s3` → `S3ObjectStorage`+`S3Config`. **빈이 조건부 생성**되므로 local 모드에선 S3 설정(`@Value`)이 평가조차 안 된다.
+4. **key는 불변, url은 동적.** `EpisodeImage.path`에 저장 key(`{seriesId}/{episodeNo}/{order}.{ext}`)만 보관하고, URL은 `urlFor(key)`로 그때그때 생성 — local은 `/files/{key}`, s3는 `{S3_PUBLIC_BASE_URL}/{key}`. URL 조립 책임을 DTO에서 **Service로 이동**(`EpisodeImageResponse.of(image, url)`)해 DTO가 스토리지를 모르게.
+5. **Testcontainers MinIO로 진짜 S3 호환 검증.** `@Transactional`/mock이 아니라 실제 MinIO 컨테이너에 put→getObject로 바이트 일치 확인(`S3ObjectStorageTest`). 실서버에서도 `STORAGE_TYPE=s3`로 업로드→MinIO 저장→public url GET 200까지 검증(코드 0 변경 전환 입증).
+
+### 작업 내역
+| 단계 | 파일 | 한 일 |
+|---|---|---|
+| 16-1 | `ObjectStorage`, `LocalObjectStorage`(신규), `ImageStorageService`(리팩토링) | 저장 추상화 + 로컬 구현 |
+| 16-1 | `EpisodeImageResponse.of(image,url)`, `EpisodeDetailResponse.of`, `EpisodeService` | url 조립을 Service로 |
+| 16-2 | `build.gradle`(aws sdk bom+s3, testcontainers-minio), `S3Config`, `S3ObjectStorage`(신규) | S3 호환 구현 |
+| 16-2 | `application.yml`(app.storage.type/s3.*), `docker-compose.yml`(MinIO+버킷init) | 설정 + 로컬 MinIO |
+| 테스트 | `LocalObjectStorageTest`(2), `S3ObjectStorageTest`(Testcontainers MinIO 2) | 양쪽 구현 검증 |
+
+### 검증
+- `./gradlew test` → **70개 통과**(16-1 후 68 → S3 2 = 70). MinIO 컨테이너 기동으로 빌드 시간↑.
+- **실서버 전환 검증**: `STORAGE_TYPE=s3 S3_ENDPOINT=http://localhost:9000 ...`로 bootRun → 회차 업로드 → `imageUrl=http://localhost:9000/apptoon/{key}` → 실제 GET 200, MinIO에 객체 저장 확인. local 모드(`/files`)와 코드 동일.
+
+### 오류/특이사항
+- **의존성은 빌드로 검증(스택 함정 회피).** AWS SDK BOM 최신(2.46.14)·testcontainers-minio 좌표를 Maven Central에서 확인 후 추가 → `dependencies`/컴파일로 해결 확인(SB4/Java25 호환 OK).
+- **버킷·공개 정책은 인프라 책임.** 앱은 `put`만 — 버킷 생성·public read는 docker-compose `minio-init`(mc)나 운영 IAM이 담당(앱이 createBucket 권한을 갖지 않는 운영 가정).
+- **`/files` 정적 핸들러는 local 전용**이지만 s3 모드에서도 남아있다(무해, 매핑만). 필요 시 조건부로 끌 수 있음(YAGNI라 보류).
+
+### 키워드
+- **포트-어댑터(추상화):** `ObjectStorage`(포트) + Local/S3(어댑터) — 도메인이 인프라 구현을 모름.
+- **S3 호환 API:** AWS SDK v2 + `endpointOverride`/`forcePathStyle` → MinIO·R2·AWS S3 단일 코드.
+- **`@ConditionalOnProperty`:** 설정값으로 빈을 켜고 끔(구현 선택). `matchIfMissing`으로 기본 구현 지정.
+- **Testcontainers MinIO:** 실제 S3 호환 서버를 컨테이너로 띄워 저장 동작을 통합 검증.
+- **휘발성 디스크(ephemeral):** 컨테이너 재시작 시 로컬 파일 소멸 → 오브젝트 스토리지로 영속화.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
