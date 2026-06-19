@@ -15,6 +15,7 @@ import com.juhkang.apptoon.domain.episode.dto.EpisodeImageResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Series;
+import com.juhkang.apptoon.domain.series.SeriesAccessChecker;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
@@ -34,6 +35,7 @@ public class EpisodeService {
     private final EpisodeImageRepository episodeImageRepository;
     private final EpisodeLikeRepository episodeLikeRepository;
     private final SeriesRepository seriesRepository;
+    private final SeriesAccessChecker seriesAccessChecker;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
 
@@ -108,6 +110,7 @@ public class EpisodeService {
     public void like(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
         if (episodeLikeRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 좋아요면 그대로
         }

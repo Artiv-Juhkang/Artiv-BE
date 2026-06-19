@@ -13,6 +13,7 @@ import com.juhkang.apptoon.domain.episode.EpisodeStatus;
 import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
 import com.juhkang.apptoon.domain.series.Series;
+import com.juhkang.apptoon.domain.series.SeriesAccessChecker;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
@@ -31,6 +32,7 @@ public class PersonalizationService {
     private final ReadLogRepository readLogRepository;
     private final BookmarkRepository bookmarkRepository;
     private final SeriesRepository seriesRepository;
+    private final SeriesAccessChecker seriesAccessChecker;
     private final EpisodeRepository episodeRepository;
     private final UserRepository userRepository;
 
@@ -56,6 +58,7 @@ public class PersonalizationService {
     public void markRead(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
         if (readLogRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 읽음
         }
@@ -67,6 +70,7 @@ public class PersonalizationService {
     public void bookmark(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
         if (bookmarkRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 북마크면 그대로
         }
