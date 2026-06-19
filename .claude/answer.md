@@ -606,6 +606,51 @@ STEP 4·5에서 **보류**했던 이미지 서빙을 닫는다. 저장만 하고
 
 ---
 
+## STEP 12 — 성인 전용(adultOnly) 분류 + 필터·정렬 ✅ 완료 (커밋: `feat: STEP 12-1/12-2 ...`)
+
+### 목표
+ToDoList 원문 *"19태그가 붙은 웹툰 중 성인 웹툰이 따로 있고, 일반 웹툰에 붙은 19로도 정렬할 수 있다"* 를 충족한다 — '성인 전용'과 '일반 작품의 19등급'을 데이터로 **구분(필터)**하고 **정렬**한다. STEP 7 이후 **첫 스키마 변경(V8)**.
+
+### ★ 반드시 알아야 할 핵심
+1. **직교 2차원 분해 = 게이트 회귀 0.** 열람 게이트(`ageRating==AGE_19` → 만19세, `verifyAgeAccess`)는 **전혀 안 건드리고**, 분류용 `boolean adultOnly` 컬럼 1개만 추가. 성인전용 = `adultOnly=true`, 일반물의19 = `ageRating=AGE_19 AND adultOnly=false`로 자연 구분. 별도 enum 세분화나 다대다 태그는 YAGNI라 배제(V7 visible 복제 최소 변경).
+2. **불변식 `adultOnly=true ⇒ ageRating=AGE_19`는 엔티티가 보장.** `Series`의 생성자·`changeAgeRating`·`changeAdultOnly`에서 `validateAdultConsistency()`로 검증 → 위반 시 `INVALID_INPUT`(400). 모순 데이터(성인전용인데 전체이용가)를 DB가 아니라 도메인이 막는다. 관리자가 AGE_19 작품을 ALL로 낮추려면 먼저 adultOnly를 꺼야 한다(명시적).
+3. **`Series.create` 오버로드로 파급 0.** 기존 6인자 `create(...)`는 `adultOnly=false`로 7인자 버전에 위임 → STEP 4~11의 모든 `Series.create` 호출부·테스트가 **무수정**. STEP 5(birthDate)처럼 시그니처를 깨지 않는 선택.
+4. **Jackson 3 primitive null 함정.** `SeriesCreateRequest.adultOnly`를 `boolean`(primitive)으로 두니, adultOnly를 **안 보내는 기존 요청이 전부 500**(`Cannot map null into type boolean`, FAIL_ON_NULL_FOR_PRIMITIVES). → `Boolean`(nullable)으로 바꾸고 Service에서 `Boolean.TRUE.equals(...)`로 false 기본 처리. 프론트는 일반 작품엔 adultOnly를 생략해도 된다.
+5. **정렬은 boolean 기준 `SeriesSort` enum.** ageRating은 STRING 저장이라 `ORDER BY ageRating`이 사전순(AGE_12<AGE_15<AGE_19<ALL)으로 연령 강도와 어긋난다 → 정렬 키로 노출하지 않음. 대신 `adultOnly`(boolean) 기준 `SeriesSort{LATEST, ADULT_FIRST}`를 Service에서 `Sort`로 매핑(`PageRequest`로 Pageable의 sort 교체). 임의 컬럼명 노출 없이 안전.
+6. **V8 마이그레이션 데이터 정합.** `add column adult_only boolean not null default false` → 기존 작품(기존 AGE_19 포함)은 일괄 **false(일반물의19)**. 즉 기존 성인작이 있었다면 '일반물의19'로 보이므로, 운영자가 `PATCH /api/admin/series/{id}/adult-only`로 재분류한다(학습 데이터 규모상 백필 스크립트는 과설계).
+
+### 작업 내역
+| 단계 | 파일 | 한 일 |
+|---|---|---|
+| 12-1 | `V8__add_series_adult_only.sql` | adult_only 컬럼(default false) |
+| 12-1 | `Series`(+adultOnly·오버로드 create·changeAdultOnly·validateAdultConsistency) | 불변식 보장 도메인 |
+| 12-1 | `SeriesCreateRequest`(Boolean adultOnly), `SeriesService.create` | 생성 시 분류 지정 |
+| 12-1 | `SeriesResponse`·`SeriesSummaryResponse`·`SeriesDetailResponse`(+adultOnly) | 노출 |
+| 12-1 | `AdultOnlyUpdateRequest`, `AdminService.changeSeriesAdultOnly`, `AdminController`(/adult-only) | 관리자 재분류 |
+| 12-2 | `SeriesSort`(enum), `SeriesRepository.search`(+adultOnly 필터), `SeriesService.getList`·`SeriesController.list` | 필터·정렬 |
+| 테스트 | `AdultClassificationTest`(7) | 불변식·노출·전환·필터·정렬 |
+
+### 검증
+- `./gradlew test` → **55개 전부 통과**(STEP 11 후 48 → 12-1 모델 4 → 12-2 필터·정렬 3 = 55).
+  - 생성: adultOnly=true+AGE_19 → 상세 adultOnly=true / adultOnly=true+ALL → **400**(불변식)
+  - 관리자: AGE_19 작품 → adultOnly 전환 200 / ALL 작품 전환 → 400
+  - 필터: `?adultOnly=true` 성인전용만(1건), `?adultOnly=false` 제외(2건)
+  - 정렬: `?sort=ADULT_FIRST` → content[0].adultOnly=true
+- **RED→GREEN×2.** 12-1(adultOnly 미지원 4건 실패) → 모델 구현, 12-2(필터·정렬 미지원 3건) → search·enum 구현.
+
+### 오류/특이사항
+- **Jackson primitive null 회귀 즉시 수정.** 12-1에서 `boolean adultOnly`가 기존 생성요청을 500으로 깨뜨림 → `Boolean`으로 교정(systematic-debugging: `Cannot map null into type boolean` 증거 → nullable). 참고: 잘못된 요청 바디가 500으로 떨어지는 것(HttpMessageNotReadableException 미처리)은 기존부터의 한계 — 400 매핑은 별도 후속.
+- **게이트 무변경 확인.** `verifyAgeAccess`·EpisodeViewerTest 4건 그대로 → 직교 분해라 19금 가드 회귀 0.
+- **(범위 유지) 비로그인 브라우징 미오픈** — search는 여전히 인증 필요. viewerId=null 가드 계속 보류.
+
+### 키워드
+- **직교 분해(orthogonal decomposition):** 한 값(AGE_19)에 뭉쳐 있던 두 관심사(열람 게이트 vs 분류)를 별 컬럼으로 분리 → 한쪽 변경이 다른 쪽에 영향 없음.
+- **도메인 불변식(invariant):** 엔티티가 항상 만족해야 하는 조건(adultOnly⇒AGE_19)을 엔티티 메서드가 스스로 보호.
+- **`FAIL_ON_NULL_FOR_PRIMITIVES`:** Jackson이 JSON의 누락/null을 primitive에 매핑할 때 실패시키는 기본 동작 → 선택 필드는 wrapper(Boolean) 사용.
+- **정렬 키 화이트리스트:** 임의 컬럼 sort 노출 대신 enum(SeriesSort)으로 허용 정렬만 제공 — STRING enum 사전순 오작동·오정렬 방지.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
