@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -44,5 +45,26 @@ public class PersonalizationController {
     @GetMapping("/api/me/subscriptions")
     public List<SubscriptionResponse> mySubscriptions(@AuthenticationPrincipal Long userId) {
         return personalizationService.getMySubscriptions(userId);
+    }
+
+    @PostMapping("/api/series/{seriesId}/episodes/{episodeNo}/bookmark")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void bookmark(@AuthenticationPrincipal Long userId,
+                         @PathVariable Long seriesId,
+                         @PathVariable int episodeNo) {
+        personalizationService.bookmark(userId, seriesId, episodeNo);
+    }
+
+    @DeleteMapping("/api/series/{seriesId}/episodes/{episodeNo}/bookmark")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unbookmark(@AuthenticationPrincipal Long userId,
+                           @PathVariable Long seriesId,
+                           @PathVariable int episodeNo) {
+        personalizationService.unbookmark(userId, seriesId, episodeNo);
+    }
+
+    @GetMapping("/api/me/bookmarks")
+    public List<BookmarkResponse> myBookmarks(@AuthenticationPrincipal Long userId) {
+        return personalizationService.getMyBookmarks(userId);
     }
 }

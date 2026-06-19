@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.apptoon.domain.episode.Episode;
 import com.juhkang.apptoon.domain.episode.EpisodeRepository;
 import com.juhkang.apptoon.domain.episode.EpisodeStatus;
+import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
@@ -28,6 +29,7 @@ public class PersonalizationService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final ReadLogRepository readLogRepository;
+    private final BookmarkRepository bookmarkRepository;
     private final SeriesRepository seriesRepository;
     private final EpisodeRepository episodeRepository;
     private final UserRepository userRepository;
@@ -59,6 +61,30 @@ public class PersonalizationService {
         }
         User user = userRepository.getReferenceById(userId);
         readLogRepository.save(ReadLog.create(user, episode));
+    }
+
+    @Transactional
+    public void bookmark(Long userId, Long seriesId, int episodeNo) {
+        Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (bookmarkRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
+            return; // 멱등: 이미 북마크면 그대로
+        }
+        User user = userRepository.getReferenceById(userId);
+        bookmarkRepository.save(Bookmark.create(user, episode));
+    }
+
+    @Transactional
+    public void unbookmark(Long userId, Long seriesId, int episodeNo) {
+        Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        bookmarkRepository.deleteByUserIdAndEpisodeId(userId, episode.getId());
+    }
+
+    public List<BookmarkResponse> getMyBookmarks(Long userId) {
+        return bookmarkRepository.findByUserIdWithEpisode(userId).stream()
+                .map(BookmarkResponse::of)
+                .toList();
     }
 
     public List<SubscriptionResponse> getMySubscriptions(Long userId) {
