@@ -1,5 +1,7 @@
 package com.juhkang.apptoon.domain.user.dto;
 
+import java.time.Instant;
+
 import com.juhkang.apptoon.domain.user.Role;
 import com.juhkang.apptoon.domain.user.User;
 
@@ -12,10 +14,11 @@ public record UserResponse(
         Long id,
         String email,
         String nickname,
-        Role role
+        Role role,
+        Instant createdAt
 ) {
 
     public static UserResponse of(User user) {
-        return new UserResponse(user.getId(), user.getEmail(), user.getNickname(), user.getRole());
+        return new UserResponse(user.getId(), user.getEmail(), user.getNickname(), user.getRole(), user.getCreatedAt());
     }
 }

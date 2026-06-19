@@ -127,4 +127,41 @@ class AdminFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
+
+    @Test
+    void 관리자는_사용자를_닉네임으로_검색한다() throws Exception {
+        mockMvc.perform(get("/api/admin/users").param("keyword", "독자")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].nickname").value("독자"));
+    }
+
+    @Test
+    void 관리자는_역할로_사용자를_필터한다() throws Exception {
+        mockMvc.perform(get("/api/admin/users").param("role", "ADMIN")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].role").value("ADMIN"));
+    }
+
+    @Test
+    void 관리자는_비공개_작품도_목록에서_조회한다() throws Exception {
+        mockMvc.perform(patch("/api/admin/series/" + seriesId + "/visibility")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"visible\":false}"))
+                .andExpect(status().isOk());
+        // 공개 목록(GET /api/series)에선 빠지지만, 관리자 목록엔 보인다
+        mockMvc.perform(get("/api/admin/series").param("visible", "false")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].visible").value(false));
+    }
+
+    @Test
+    void 비관리자는_관리자_목록API에_접근할_수_없다_403() throws Exception {
+        mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isForbidden());
+    }
 }

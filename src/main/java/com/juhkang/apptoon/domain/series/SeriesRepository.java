@@ -28,4 +28,10 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
 
     @Query("select s from Series s join fetch s.author where s.author.id = :authorId order by s.id desc")
     List<Series> findByAuthorId(@Param("authorId") Long authorId);
+
+    /** 관리자용: visible 무관(또는 옵셔널 필터) 전체 작품. 비공개 작품도 관리 목록에 보이게. */
+    @Query(value = "select s from Series s join fetch s.author "
+            + "where (:visible is null or s.visible = :visible) order by s.id desc",
+            countQuery = "select count(s) from Series s where (:visible is null or s.visible = :visible)")
+    Page<Series> findForAdmin(@Param("visible") Boolean visible, Pageable pageable);
 }

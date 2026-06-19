@@ -181,7 +181,26 @@ button { font-family: inherit; }
 .upload-drop { border: 2.5px dashed var(--ink); padding: 20px; text-align: center; cursor: pointer; background: #faf9fc; }
 .upload-drop.drag { background: var(--mark); }
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.thumb { width: 56px; height: 76px; object-fit: cover; border: 2px solid var(--ink); }
+.thumb-wrap { position: relative; width: 56px; height: 76px; }
+.thumb { width: 56px; height: 76px; object-fit: cover; border: 2px solid var(--ink); display: block; }
+.thumb-no { position: absolute; left: -3px; top: -3px; min-width: 16px; height: 16px; padding: 0 3px; font-size: 11px;
+  font-weight: 800; line-height: 16px; text-align: center; color: #fff; background: var(--ink); }
+.thumb-x { position: absolute; right: -7px; top: -7px; width: 19px; height: 19px; padding: 0; line-height: 15px;
+  font-size: 14px; font-weight: 800; color: #fff; background: var(--vermilion); border: 2px solid var(--ink);
+  border-radius: 50%; cursor: pointer; }
+.thumb-x:hover { background: var(--ink); }
+
+/* ---- 필터/검색 ---- */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.chip { padding: 8px 14px; font-weight: 700; font-size: 13px; border: 2.5px solid var(--ink); background: var(--canvas);
+  cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .08s, box-shadow .08s; }
+.chip:hover { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.chip[aria-current="true"] { background: var(--ink); color: #fff; }
+.search-input { flex: 1; min-width: 200px; font-family: inherit; font-size: 15px; padding: 10px 13px;
+  border: 2.5px solid var(--ink); background: var(--canvas); color: var(--ink); }
+.search-input:focus { outline: none; box-shadow: var(--shadow-sm); }
+.filters select { font-family: inherit; font-size: 14px; font-weight: 600; padding: 9px 11px;
+  border: 2.5px solid var(--ink); background: var(--canvas); color: var(--ink); }
 
 /* ---- 반응형 ---- */
 @media (max-width: 760px) {

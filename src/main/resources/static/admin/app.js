@@ -130,7 +130,7 @@
   // ====================================================================
   function navItems() {
     if (state.user.role === 'ADMIN') {
-      return [['admin-series', '작품 관리'], ['admin-users', '사용자 권한']];
+      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리']];
     }
     return [['dashboard', '내 작품'], ['create', '작품 등록']];
   }
@@ -297,9 +297,11 @@
   // ====================================================================
   // 작가 — 회차 업로드 모달
   // ====================================================================
-  let uploadFiles = [];
+  const MAX_IMG_BYTES = 10 * 1024 * 1024;
+  let uploadFiles = []; // [{ id, file, url }]
+  let uploadSeq = 0;
   function openUpload(seriesId, title) {
-    uploadFiles = [];
+    uploadFiles = []; uploadSeq = 0;
     const m = document.createElement('div');
     m.className = 'modal-bg'; m.id = 'uploadModal';
     m.innerHTML = `<form class="modal panel" id="uploadForm">
@@ -307,9 +309,9 @@
       <div class="field"><label for="u-title">회차 제목</label><input id="u-title" required placeholder="예) 1화 — 시작" /></div>
       <div class="field"><label for="u-publish">예약 발행 (선택)</label><input id="u-publish" type="datetime-local" />
         <span class="hint">비워두면 즉시 발행</span></div>
-      <div class="field"><label>이미지 (여러 장, jpg/png)</label>
+      <div class="field"><label>이미지 (여러 장, jpg/png · 최대 10MB)</label>
         <label class="upload-drop" id="u-drop"><input id="u-files" type="file" accept="image/png,image/jpeg" multiple hidden>
-          <b>클릭해서 이미지 선택</b><div class="hint">순서대로 업로드돼요</div></label>
+          <b id="u-drop-label">클릭하거나 끌어다 놓기</b><div class="hint">위에서부터 순서대로 발행돼요 · 여러 번 추가할 수 있어요</div></label>
         <div class="thumbs" id="u-thumbs"></div></div>
       <div class="modal__actions">
         <button type="button" class="btn btn--sm" id="u-cancel">취소</button>
@@ -318,18 +320,42 @@
     document.body.appendChild(m);
     const filesInput = $('#u-files'), drop = $('#u-drop');
     $('#u-title').focus();
-    drop.addEventListener('click', () => filesInput.click());
-    filesInput.addEventListener('change', () => { uploadFiles = [...filesInput.files]; renderThumbs(); });
+    filesInput.addEventListener('change', () => { addFiles(filesInput.files); filesInput.value = ''; });
     ['dragover','dragleave','drop'].forEach((ev) => drop.addEventListener(ev, (e) => {
       e.preventDefault(); drop.classList.toggle('drag', ev === 'dragover');
-      if (ev === 'drop') { uploadFiles = [...e.dataTransfer.files].filter((f)=>f.type.startsWith('image/')); renderThumbs(); }
+      if (ev === 'drop') addFiles(e.dataTransfer.files);
     }));
-    $('#u-cancel').addEventListener('click', () => m.remove());
-    m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+    $('#u-thumbs').addEventListener('click', (e) => {
+      const del = e.target.closest('[data-del]');
+      if (del) { e.preventDefault(); removeFile(Number(del.dataset.del)); }
+    });
+    $('#u-cancel').addEventListener('click', () => closeUpload(m));
+    m.addEventListener('click', (e) => { if (e.target === m) closeUpload(m); });
     $('#uploadForm').addEventListener('submit', (e) => onUpload(e, seriesId, m));
   }
+  function addFiles(fileList) {
+    const all = [...fileList];
+    const imgs = all.filter((f) => f.type === 'image/png' || f.type === 'image/jpeg');
+    const ok = imgs.filter((f) => f.size <= MAX_IMG_BYTES);
+    ok.forEach((f) => uploadFiles.push({ id: ++uploadSeq, file: f, url: URL.createObjectURL(f) }));
+    renderThumbs();
+    if (imgs.length < all.length) toast('jpg·png 이미지만 추가할 수 있어요', 'err');
+    else if (ok.length < imgs.length) toast(`${imgs.length - ok.length}장은 10MB를 넘어 제외했어요`, 'err');
+  }
+  function removeFile(id) {
+    const i = uploadFiles.findIndex((it) => it.id === id);
+    if (i < 0) return;
+    URL.revokeObjectURL(uploadFiles[i].url);
+    uploadFiles.splice(i, 1);
+    renderThumbs();
+  }
+  function closeUpload(m) { uploadFiles.forEach((it) => URL.revokeObjectURL(it.url)); uploadFiles = []; m.remove(); }
   function renderThumbs() {
-    $('#u-thumbs').innerHTML = uploadFiles.map((f) => `<img class="thumb" src="${URL.createObjectURL(f)}" alt="">`).join('');
+    $('#u-thumbs').innerHTML = uploadFiles.map((it, i) =>
+      `<div class="thumb-wrap"><img class="thumb" src="${it.url}" alt=""><span class="thumb-no">${i + 1}</span>` +
+      `<button type="button" class="thumb-x" data-del="${it.id}" aria-label="삭제">×</button></div>`).join('');
+    const label = $('#u-drop-label');
+    if (label) label.textContent = uploadFiles.length ? `이미지 ${uploadFiles.length}장 — 더 추가하기` : '클릭하거나 끌어다 놓기';
   }
   async function onUpload(e, seriesId, modal) {
     e.preventDefault();
@@ -340,12 +366,12 @@
     fd.append('title', title);
     const pub = $('#u-publish').value;
     if (pub) fd.append('publishAt', new Date(pub).toISOString());
-    uploadFiles.forEach((f) => fd.append('images', f));
+    uploadFiles.forEach((it) => fd.append('images', it.file));
     const btn = $('#u-submit'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
       const r = await api('POST', `/api/series/${seriesId}/episodes`, { form: fd });
       toast(`${r.episodeNo}화를 업로드했어요`, 'ok');
-      modal.remove();
+      closeUpload(modal);
       if (state.view === 'episodes') route();
     } catch (err) { toast(errMsg(err), 'err'); btn.disabled = false; btn.textContent = '업로드'; }
   }
@@ -353,15 +379,24 @@
   // ====================================================================
   // 관리자 — 작품 관리
   // ====================================================================
+  let adminSeriesFilter = ''; // '' 전체 | 'true' 공개 | 'false' 비공개
   async function viewAdminSeries() {
+    const chips = [['', '전체'], ['true', '공개'], ['false', '비공개']];
     setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>작품 관리</h1>
-      <p>공개 작품의 연령등급·공개여부·성인분류를 변경하세요</p></div></div>
+      <p>비공개 작품 포함 전체. 연령등급·공개여부·성인분류를 변경하세요</p></div></div>
+      <div class="filters" id="as-filter">${chips.map(([v, l]) =>
+        `<button class="chip" data-v="${v}" ${v === adminSeriesFilter ? 'aria-current="true"' : ''}>${l}</button>`).join('')}</div>
       <div id="as-list">${loading}</div>`);
+    $('#as-filter').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]'); if (!b) return;
+      adminSeriesFilter = b.dataset.v; viewAdminSeries();
+    });
     try {
-      const page = await api('GET', '/api/series?size=100');
+      const q = adminSeriesFilter ? `&visible=${adminSeriesFilter}` : '';
+      const page = await api('GET', `/api/admin/series?size=100${q}`);
       const rows = page.content;
       $('#as-list').innerHTML = rows.length ? `<div class="rows">${rows.map(adminSeriesRow).join('')}</div>`
-        : emptyBox('공개된 작품이 없어요', '작가가 작품을 공개하면 여기에 표시돼요.');
+        : emptyBox('작품이 없어요', '작가가 작품을 등록하면 여기에 표시돼요.');
       $('#as-list').addEventListener('click', onAdminSeriesClick);
     } catch (e) { $('#as-list').innerHTML = errBox(e); }
   }
@@ -415,30 +450,64 @@
   // ====================================================================
   // 관리자 — 사용자 권한
   // ====================================================================
+  const ROLE_LABEL = { READER: '독자', CREATOR: '작가', ADMIN: '관리자' };
   function viewAdminUsers() {
-    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>사용자 권한</h1>
-      <p>사용자 ID로 역할을 변경합니다 (작가 권한 부여 등)</p></div></div>
-      <form class="panel form-panel" id="roleForm" style="max-width:480px">
-        <div class="field"><label for="r-uid">사용자 ID</label><input id="r-uid" type="number" min="1" required placeholder="예) 2" />
-          <span class="hint">현재는 사용자 ID 기반 — 사용자 검색 API는 추후 추가 예정</span></div>
-        <div class="field"><label for="r-role">역할</label><select id="r-role">
-          <option value="READER">독자 (READER)</option>
-          <option value="CREATOR">작가 (CREATOR)</option>
-          <option value="ADMIN">관리자 (ADMIN)</option></select></div>
-        <button class="btn btn--accent" type="submit" id="r-submit">역할 변경</button>
-        <div id="r-result" style="margin-top:14px"></div>
-      </form>`);
-    $('#roleForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const uid = $('#r-uid').value, role = $('#r-role').value;
-      if (!uid) return toast('사용자 ID를 입력하세요', 'err');
-      const btn = $('#r-submit'); btn.disabled = true;
-      try {
-        const u = await api('PATCH', `/api/admin/users/${uid}/role`, { json: { role } });
-        $('#r-result').innerHTML = `<div class="panel" style="padding:14px"><b>${esc(u.nickname)}</b> (${esc(u.email)}) → <span class="tag">${esc(u.role)}</span></div>`;
-        toast('역할을 변경했어요', 'ok');
-      } catch (err) { toast(err.status === 404 ? '해당 ID의 사용자가 없어요' : errMsg(err), 'err'); }
-      finally { btn.disabled = false; }
+    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>사용자 관리</h1>
+      <p>닉네임·이메일로 검색하고 역할을 변경하세요</p></div></div>
+      <form class="filters" id="us-search">
+        <input class="search-input" id="us-kw" placeholder="닉네임 또는 이메일 검색" autocomplete="off" />
+        <select id="us-role">
+          <option value="">전체 역할</option>
+          <option value="READER">독자</option><option value="CREATOR">작가</option><option value="ADMIN">관리자</option>
+        </select>
+        <button class="btn btn--sm" type="submit">검색</button>
+      </form>
+      <div id="us-list">${loading}</div>`);
+    $('#us-search').addEventListener('submit', (e) => { e.preventDefault(); loadUsers(); });
+    loadUsers();
+  }
+  async function loadUsers() {
+    const kw = $('#us-kw')?.value.trim() || '', role = $('#us-role')?.value || '';
+    const list = $('#us-list'); if (list) list.innerHTML = loading;
+    try {
+      const q = `size=50${kw ? `&keyword=${encodeURIComponent(kw)}` : ''}${role ? `&role=${role}` : ''}`;
+      const page = await api('GET', `/api/admin/users?${q}`);
+      $('#us-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(userRow).join('')}</div>`
+        : emptyBox('사용자가 없어요', '검색어나 역할 필터를 바꿔보세요.');
+      $('#us-list').addEventListener('click', onUserClick);
+    } catch (e) { $('#us-list').innerHTML = errBox(e); }
+  }
+  function userRow(u) {
+    const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('ko-KR') : '';
+    return `<div class="row" data-id="${u.id}" data-role="${u.role}">
+      <span class="row__no mono">#${u.id}</span>
+      <div class="row__main"><div class="t">${esc(u.nickname)}</div><div class="s">${esc(u.email)} · 가입 ${joined}</div></div>
+      <div class="row__side"><span class="tag ${u.role === 'ADMIN' ? 'tag--19' : ''}">${ROLE_LABEL[u.role] || u.role}</span>
+        <button class="btn btn--sm" data-act="role">역할 변경</button></div></div>`;
+  }
+  function onUserClick(e) {
+    if (e.target.closest('[data-act="role"]')) {
+      const row = e.target.closest('.row');
+      openRoleModal(Number(row.dataset.id), row.dataset.role, row.querySelector('.t').textContent);
+    }
+  }
+  function openRoleModal(id, role, name) {
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel">
+      <h2>역할 변경</h2><p class="sub">#${id} · ${esc(name)}</p>
+      <div class="field"><label>역할</label><select id="rm-role">
+        ${['READER', 'CREATOR', 'ADMIN'].map((r) => `<option value="${r}" ${r === role ? 'selected' : ''}>${ROLE_LABEL[r]} (${r})</option>`).join('')}</select></div>
+      <div class="modal__actions"><button class="btn btn--sm" data-x>취소</button>
+        <button class="btn btn--accent btn--sm" data-ok>변경</button></div></div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', async (e) => {
+      if (e.target === m || e.target.closest('[data-x]')) return m.remove();
+      if (e.target.closest('[data-ok]')) {
+        try { await api('PATCH', `/api/admin/users/${id}/role`, { json: { role: $('#rm-role', m).value } });
+          toast('역할을 변경했어요', 'ok'); m.remove(); loadUsers();
+        } catch (err) { toast(errMsg(err), 'err'); }
+      }
     });
   }
 

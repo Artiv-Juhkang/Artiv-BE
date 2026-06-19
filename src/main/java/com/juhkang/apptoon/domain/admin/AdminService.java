@@ -1,5 +1,6 @@
 package com.juhkang.apptoon.domain.admin;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,10 +8,12 @@ import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
 import com.juhkang.apptoon.domain.series.dto.SeriesResponse;
+import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.domain.user.Role;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.domain.user.dto.UserResponse;
+import com.juhkang.apptoon.global.dto.PageResponse;
 import com.juhkang.apptoon.global.exception.BusinessException;
 import com.juhkang.apptoon.global.exception.ErrorCode;
 
@@ -23,6 +26,16 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final SeriesRepository seriesRepository;
+
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> getUsers(String keyword, Role role, Pageable pageable) {
+        return PageResponse.from(userRepository.search(keyword, role, pageable).map(UserResponse::of));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<SeriesSummaryResponse> getAllSeries(Boolean visible, Pageable pageable) {
+        return PageResponse.from(seriesRepository.findForAdmin(visible, pageable).map(SeriesSummaryResponse::of));
+    }
 
     public UserResponse changeUserRole(Long userId, Role role) {
         User user = userRepository.findById(userId)
