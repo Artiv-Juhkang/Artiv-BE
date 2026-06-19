@@ -651,6 +651,46 @@ ToDoList 원문 *"19태그가 붙은 웹툰 중 성인 웹툰이 따로 있고, 
 
 ---
 
+## STEP 13 — 댓글(Comment) + 좋아요(Like) ✅ 완료 (커밋: `feat: STEP 13-1/13-2 ...`)
+
+### 목표
+사용자가 ToDoList에 직접 적은 핵심 요구 — **회차 좋아요**(멱등 토글 + 좋아요 수)와 **회차 댓글**(작성/목록/삭제)을 기존 멱등·페이징 패턴 복제로 추가한다.
+
+### ★ 반드시 알아야 할 핵심
+1. **멱등 토글은 STEP 6 패턴을 그대로 복제.** `EpisodeLike`는 `ReadLog`와 동일한 user-episode 구조(`@UniqueConstraint` + `exists` 선검사 + `getReferenceById`). 중복 좋아요는 에러가 아니라 무시(멱등), 취소는 `deleteByUserIdAndEpisodeId`. V9는 `read_logs` 마이그레이션 복제.
+2. **좋아요는 episode 패키지에 둬서 순환을 피한다.** 좋아요 수·내 좋아요 여부를 **회차 상세에 동봉**(1요청)하려면 집계가 필요한데, 이를 episode 도메인 안(`EpisodeLikeRepository`)에 두면 `EpisodeService`가 같은 패키지를 참조해 **새 import 순환이 안 생긴다**. (STEP 11에서 series↔episode·series↔personalization 순환을 만든 cross-domain 조합과 대비 — 같은 "상세 1요청" 목표를 순환 없이 달성.)
+3. **댓글은 신규 `comment` 패키지(단방향 의존).** `Comment`(user·episode·content) → comment가 episode·user를 참조할 뿐 역참조 없음. 목록은 `join fetch c.user` + `PageResponse` 페이징(STEP 3 패턴). 작성 응답은 `IdResponse` 재사용. 대댓글/멘션/신고는 보류(YAGNI).
+4. **삭제 권한은 Service에서(본인·ADMIN).** `comment.isOwnedBy(userId) || isAdmin` 아니면 `FORBIDDEN`(불변 규칙: 권한 검증은 Service). ADMIN 판정은 컨트롤러가 `Authentication`에서 추출해 전달.
+5. **`AuthSupport` 추출(rule of three).** ADMIN 판정 `hasAdminRole`이 Series·Episode에 이어 Comment에서 **3번째**로 필요해져, `domain/auth/AuthSupport.isAdmin(Authentication)`으로 추출하고 3곳을 통일. global이 아니라 auth 도메인에 둬서 `Role`을 자연스럽게 참조(global→domain 역의존 회피).
+
+### 작업 내역
+| 단계 | 파일 | 한 일 |
+|---|---|---|
+| 13-1 | `V9__create_episode_likes.sql`, `EpisodeLike`, `EpisodeLikeRepository` | 좋아요 엔티티(멱등) |
+| 13-1 | `EpisodeService`(+like·unlike, getDetail 집계), `EpisodeController`(POST/DELETE /like), `EpisodeDetailResponse`(+likeCount·liked) | 토글 + 상세 노출 |
+| 13-2 | `V10__create_comments.sql`, `Comment`, `CommentRepository`, `CommentService`, `CommentController`, `CommentResponse`·`CommentCreateRequest` | 댓글 작성/목록/삭제 |
+| 13-2 | `AuthSupport`(신규), `Series/EpisodeController`(hasAdminRole → AuthSupport.isAdmin) | ADMIN 판정 통일 |
+| 테스트 | `EpisodeLikeTest`(1), `CommentTest`(4) | 멱등·집계·권한 |
+
+### 검증
+- `./gradlew test` → **60개 전부 통과**(STEP 12 후 55 → 좋아요 1 → 댓글 4 = 60).
+  - 좋아요: 토글 멱등(중복 무시), 상세에 likeCount·liked, 취소 시 0/false
+  - 댓글: 작성→목록(내용·작성자), 본인 삭제 204, 타인 삭제 **403**, ADMIN 삭제 204
+- **RED→GREEN×2.** 13-1(like 엔드포인트 404·likeCount 부재) → 좋아요 구현, 13-2(comments 404·권한) → 댓글+AuthSupport 구현.
+
+### 오류/특이사항
+- **순환 회피 설계.** 좋아요를 personalization이 아니라 episode 패키지에 둔 것은 의도적 — episode↔personalization 순환을 안 만들고 상세 1요청을 달성. 읽음(ReadLog)은 UP 계산용이라 personalization, 좋아요는 상세 노출용이라 episode로 용도에 따라 배치.
+- **기존 코드 정리는 STEP 범위 내로 한정.** AuthSupport 추출 시 Series/Episode의 hasAdminRole만 교체(동작 동일, 테스트 그대로 통과). 무관한 리팩토링은 안 함.
+- **재설계 로드맵 STEP(9~13) 완료.** 이후는 추가기능(조회수·북마크·인앱알림)만 남음.
+
+### 키워드
+- **멱등 토글(idempotent toggle):** 같은 요청 반복해도 상태 동일(중복 좋아요 무시), unique 제약 + exists 선검사로 보장.
+- **도메인 배치와 결합:** 같은 데이터라도 어느 도메인에 두느냐로 패키지 의존 방향이 갈림 — 좋아요를 episode에 둬 순환 회피.
+- **rule of three:** 같은 코드가 3번째 중복되면 추출(AuthSupport) — 2번까진 복제 허용, 3번째에 통일.
+- **평면 댓글(flat comment):** 대댓글 트리 없이 회차당 1단 목록 — 학습 범위 단순화.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
