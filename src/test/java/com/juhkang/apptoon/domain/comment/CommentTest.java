@@ -87,6 +87,17 @@ class CommentTest {
     }
 
     @Test
+    void 댓글_1000자_초과는_500이_아니라_400이다() throws Exception {
+        String tooLong = "a".repeat(1001);
+        mockMvc.perform(post(commentsUrl)
+                        .header("Authorization", "Bearer " + commenterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
+    @Test
     void 댓글을_작성하면_목록에_작성자와_함께_보인다() throws Exception {
         writeComment(commenterToken, "재밌어요");
 
