@@ -1,6 +1,7 @@
 package com.juhkang.apptoon.domain.series;
 
 import java.time.DayOfWeek;
+import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
-import com.juhkang.apptoon.domain.series.dto.SeriesResponse;
+import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.domain.user.Role;
 import com.juhkang.apptoon.global.dto.IdResponse;
@@ -46,14 +47,20 @@ public class SeriesController {
     public PageResponse<SeriesSummaryResponse> list(
             @RequestParam(required = false) DayOfWeek day,
             @RequestParam(required = false) AgeRating ageRating,
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
-        return seriesService.getList(day, ageRating, pageable);
+        return seriesService.getList(day, ageRating, keyword, pageable);
+    }
+
+    @GetMapping("/mine")
+    public List<SeriesSummaryResponse> mySeries(@AuthenticationPrincipal Long userId) {
+        return seriesService.getMySeries(userId);
     }
 
     @GetMapping("/{id}")
-    public SeriesResponse detail(@AuthenticationPrincipal Long userId,
-                                 @PathVariable Long id,
-                                 Authentication authentication) {
+    public SeriesDetailResponse detail(@AuthenticationPrincipal Long userId,
+                                       @PathVariable Long id,
+                                       Authentication authentication) {
         return seriesService.getDetail(id, userId, hasAdminRole(authentication));
     }
 

@@ -18,6 +18,11 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     @Query("select coalesce(max(e.episodeNo), 0) from Episode e where e.series.id = :seriesId")
     int findMaxEpisodeNo(@Param("seriesId") Long seriesId);
 
+    int countBySeriesIdAndStatus(Long seriesId, EpisodeStatus status);
+
+    @Query("select coalesce(max(e.episodeNo), 0) from Episode e where e.series.id = :seriesId and e.status = :status")
+    int findMaxEpisodeNoBySeriesIdAndStatus(@Param("seriesId") Long seriesId, @Param("status") EpisodeStatus status);
+
     Optional<Episode> findBySeriesIdAndEpisodeNo(Long seriesId, int episodeNo);
 
     Slice<Episode> findBySeriesIdAndStatusOrderByEpisodeNoAsc(Long seriesId, EpisodeStatus status, Pageable pageable);

@@ -1,6 +1,7 @@
 package com.juhkang.apptoon.domain.series;
 
 import java.time.DayOfWeek;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,10 +14,16 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
     @Query(value = "select s from Series s join fetch s.author "
             + "where s.visible = true "
             + "and (:day is null or :day member of s.publishDays) "
-            + "and (:ageRating is null or s.ageRating = :ageRating)",
+            + "and (:ageRating is null or s.ageRating = :ageRating) "
+            + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%')))",
             countQuery = "select count(s) from Series s "
                     + "where s.visible = true "
                     + "and (:day is null or :day member of s.publishDays) "
-                    + "and (:ageRating is null or s.ageRating = :ageRating)")
-    Page<Series> search(@Param("day") DayOfWeek day, @Param("ageRating") AgeRating ageRating, Pageable pageable);
+                    + "and (:ageRating is null or s.ageRating = :ageRating) "
+                    + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%')))")
+    Page<Series> search(@Param("day") DayOfWeek day, @Param("ageRating") AgeRating ageRating,
+                         @Param("keyword") String keyword, Pageable pageable);
+
+    @Query("select s from Series s join fetch s.author where s.author.id = :authorId order by s.id desc")
+    List<Series> findByAuthorId(@Param("authorId") Long authorId);
 }

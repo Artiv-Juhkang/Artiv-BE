@@ -92,6 +92,25 @@ class SeriesFlowTest {
     }
 
     @Test
+    void 제목_키워드로_작품을_검색한다() throws Exception {
+        createSeries(creatorToken, """
+                {"title":"로맨스판타지","description":"","ageRating":"ALL","status":"ONGOING","publishDays":["MONDAY"]}""");
+        createSeries(creatorToken, """
+                {"title":"액션스릴러","description":"","ageRating":"ALL","status":"ONGOING","publishDays":["TUESDAY"]}""");
+
+        mockMvc.perform(get("/api/series").param("keyword", "로맨스")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("로맨스판타지"));
+
+        mockMvc.perform(get("/api/series").param("keyword", "무협")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
     void 작품_상세를_조회한다() throws Exception {
         createSeries(creatorToken, """
                 {"title":"상세작품","description":"상세설명","ageRating":"AGE_15","status":"ONGOING","publishDays":["FRIDAY"]}""");
