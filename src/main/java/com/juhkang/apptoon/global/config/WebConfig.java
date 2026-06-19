@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -32,5 +33,12 @@ public class WebConfig implements WebMvcConfigurer {
         }
         registry.addResourceHandler("/files/**")
                 .addResourceLocations(location);
+    }
+
+    /** 작가·관리자 콘솔 SPA 진입점. /admin → static/admin/index.html */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/admin").setViewName("forward:/admin/index.html");
+        registry.addViewController("/admin/").setViewName("forward:/admin/index.html");
     }
 }
