@@ -691,6 +691,65 @@ ToDoList 원문 *"19태그가 붙은 웹툰 중 성인 웹툰이 따로 있고, 
 
 ---
 
+## STEP 14 — 회차 조회수(viewCount) ✅ 완료 (커밋: `feat: STEP 14 ...`)
+
+### 목표
+회차 상세를 열 때마다 조회수를 올리고 상세 응답에 노출한다(추가기능 1/3).
+
+### ★ 반드시 알아야 할 핵심
+1. **더티 체킹으로 증가.** `Episode.increaseViewCount()`(`this.viewCount++`)를 `getDetail`에서 호출 → `@Transactional` 종료 시 Hibernate가 UPDATE 자동 생성(별도 save 불필요). `getDetail`을 클래스 기본 `readOnly=true`에서 **메서드 `@Transactional`(쓰기)로 오버라이드**해야 UPDATE가 나간다.
+2. **조회 = 가드 통과 시점.** viewCount 증가를 visible/status 가드 **뒤**에 둬서, 404로 막히는 비공개·미발행 조회는 카운트되지 않는다(작가 프리뷰는 카운트됨 — 단순화).
+3. **동시성 한계(정직하게 기록).** 더티 체킹은 read-modify-write라 동시 조회 시 **lost update**(두 요청이 같은 값을 읽고 +1 → 하나만 반영) 가능. 정확한 카운트가 필요하면 원자적 `update episodes set view_count = view_count + 1`(@Modifying)로 바꿔야 한다. 학습 범위상 더티 체킹 채택.
+4. **V11**: `add column view_count bigint not null default 0` — 기존 회차는 0부터.
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `V11__add_episode_view_count.sql` | view_count 컬럼 |
+| `Episode`(+viewCount·increaseViewCount) | 증가 도메인 메서드 |
+| `EpisodeService.getDetail`(@Transactional) | 조회 시 증가 |
+| `EpisodeDetailResponse`(+viewCount) | 노출 |
+| `EpisodeViewCountTest` | 조회마다 증가 검증 |
+
+### 검증
+- `./gradlew test` → **61개 통과**. 같은 회차 2회 조회 → viewCount 1 → 2.
+- RED(viewCount 필드 부재) → 더티 체킹 구현 GREEN.
+
+### 키워드
+- **더티 체킹(dirty checking):** 영속 엔티티의 변경을 트랜잭션 커밋 시 자동 UPDATE.
+- **lost update:** 동시 read-modify-write가 서로의 갱신을 덮어쓰는 경합 — 원자적 UPDATE/락으로 해결.
+- **메서드 단위 트랜잭션 오버라이드:** 클래스 readOnly 위에서 쓰기 메서드만 `@Transactional`로 승격.
+
+---
+
+## STEP 15 — 회차 북마크(Bookmark) ✅ 완료 (커밋: `feat: STEP 15 ...`)
+
+### 목표
+회차를 북마크(저장)하고 내 북마크 목록을 본다(추가기능 2/3).
+
+### ★ 반드시 알아야 할 핵심
+1. **STEP 13 좋아요 패턴을 그대로 복제.** `Bookmark`(user-episode `@UniqueConstraint`) + 멱등 토글(`exists` 선검사 → `getReferenceById` save / `deleteByUserIdAndEpisodeId`). V12는 `episode_likes` 복제.
+2. **배치는 personalization — 좋아요(episode)와 다른 이유.** 좋아요는 회차 상세에 카운트를 **노출**해야 해서 episode 패키지였지만, 북마크는 "내 북마크 목록"이라 **개인화 표면**(구독·읽음과 함께)이다. 데이터 구조는 같아도 용도(상세 집계 vs 내 목록)에 따라 도메인을 배치 → 순환 없이 PersonalizationService에 자연스럽게 흡수.
+3. **내 목록은 join fetch로 N+1 회피.** `findByUserIdWithEpisode`가 `join fetch b.episode e join fetch e.series`로 한 쿼리에 회차·작품을 끌어와 `BookmarkResponse`(작품 제목·회차번호)를 만든다(STEP 6 구독목록 패턴).
+
+### 작업 내역
+| 파일 | 한 일 |
+|---|---|
+| `V12__create_bookmarks.sql`, `Bookmark`, `BookmarkRepository` | 북마크 엔티티(멱등) |
+| `PersonalizationService`(+bookmark·unbookmark·getMyBookmarks), `PersonalizationController` | 토글 + 내 목록 |
+| `BookmarkResponse` | 작품·회차 정보 |
+| `BookmarkTest` | 멱등·목록 검증 |
+
+### 검증
+- `./gradlew test` → **62개 통과**. 북마크 멱등(중복 무시) → `/api/me/bookmarks`에 작품제목·회차번호 1건 → 취소 시 0건.
+- RED(bookmark 404·목록 부재) → 구현 GREEN.
+
+### 키워드
+- **멱등 토글 재사용:** 같은 user-X 유니크 패턴을 구독·읽음·좋아요·북마크가 공유(코드 반복으로 학습 정착).
+- **용도에 따른 도메인 배치:** 동일 데이터라도 노출 맥락(상세 집계 vs 내 목록)이 패키지 선택을 가른다.
+
+---
+
 ## Docker — 역할 · 사용법 · 작동 방식 (자세히)
 
 ### 1) Docker가 푸는 문제 (왜 쓰나)
