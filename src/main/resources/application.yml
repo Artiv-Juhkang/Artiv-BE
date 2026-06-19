@@ -23,7 +23,15 @@ server:
 
 app:
   storage:
-    root: ${STORAGE_ROOT:storage}      # 업로드 이미지 저장 루트(로컬). 운영은 환경변수로 덮어씀.
+    type: ${STORAGE_TYPE:local}        # local(로컬 디스크+/files) | s3(MinIO/R2/AWS S3)
+    root: ${STORAGE_ROOT:storage}      # local 일 때 업로드 이미지 저장 루트. 운영은 환경변수로 덮어씀.
+    s3:                                # type=s3 일 때만 사용
+      endpoint: ${S3_ENDPOINT:}        # MinIO http://localhost:9000 / R2·AWS S3 엔드포인트
+      region: ${S3_REGION:us-east-1}
+      bucket: ${S3_BUCKET:apptoon}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}   # 이미지 공개 베이스(또는 CDN). 예: http://localhost:9000/apptoon
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:*}   # 프론트 origin 화이트리스트(콤마 구분). 개발=전체, 운영은 환경변수로 좁힘.
 

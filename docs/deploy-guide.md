@@ -51,17 +51,34 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ---
 
-## 2. ⚠️ 이미지 저장 — 운영의 유일한 실질 코드 변경
+## 2. ✅ 이미지 저장 — S3 호환으로 전환 가능 (구현 완료)
 
-현재 `ImageStorageService`가 로컬 디스크(`storage/`)에 저장하고 `/files/**`로 서빙한다. 컨테이너 환경에선 재배포/재시작 때 **디스크가 초기화**되어 업로드 이미지가 사라진다.
+`ObjectStorage` 인터페이스로 저장 백엔드를 추상화해 두어, **코드 변경 없이 `app.storage.type` 환경변수만으로 로컬↔S3 전환**이 된다. 컨테이너의 휘발성 디스크 문제는 `type=s3`로 해결한다.
 
-**해결책 (택1):**
-1. **오브젝트 스토리지(권장)** — AWS S3 / Cloudflare R2 / Supabase Storage
-   - `ImageStorageService`를 S3 업로드로 교체(`software.amazon.awssdk:s3`), 저장 후 객체 URL을 반환.
-   - `EpisodeImageResponse.url`을 S3 URL(또는 CloudFront CDN)로. `/files/**` 정적 핸들러는 제거 가능.
-   - 별도 STEP으로 구현 권장(재설계 노트의 "문제화 시 외부 스토리지로 승격" 지점).
-2. **영속 볼륨(임시 회피)** — Railway Volume / Fly Volume 등을 `STORAGE_ROOT`에 마운트.
-   - 코드 변경 없이 가능하지만 스케일아웃·CDN에 불리. MVP 임시용.
+- `type=local`(기본): 로컬 디스크 + `/files/**` 서빙 — 개발용
+- `type=s3`: AWS SDK v2 `S3Client`(endpoint override) — **MinIO·Cloudflare R2·AWS S3 모두 호환**(벤더 종속 없음)
+
+**S3 모드 환경변수:**
+```bash
+STORAGE_TYPE=s3
+S3_ENDPOINT=https://<s3-endpoint>          # MinIO: http://minio:9000 / R2·AWS S3 엔드포인트
+S3_REGION=us-east-1
+S3_BUCKET=apptoon
+S3_ACCESS_KEY=...    S3_SECRET_KEY=...
+S3_PUBLIC_BASE_URL=https://<cdn-or-bucket-public-base>   # 이미지 공개 베이스. 예: https://cdn.example.com/apptoon
+```
+- 버킷은 **미리 생성**하고 이미지 객체는 **public read**(또는 CDN)로 노출. `EpisodeImageResponse.url`이 `S3_PUBLIC_BASE_URL/{key}`로 내려간다.
+- 운영 전환은 위 환경변수만 주입하면 끝(코드 동일). AWS S3는 `S3_ENDPOINT` 생략 가능(기본 AWS), R2는 R2 엔드포인트 지정.
+
+**로컬에서 S3 모드 시험(MinIO):** `docker compose up -d`가 MinIO + 버킷(`apptoon`, public read)을 자동 구성한다.
+```bash
+docker compose up -d                 # db + minio + 버킷 생성(minio-init)
+STORAGE_TYPE=s3 S3_ENDPOINT=http://localhost:9000 S3_REGION=us-east-1 \
+S3_BUCKET=apptoon S3_ACCESS_KEY=minioadmin S3_SECRET_KEY=minioadmin \
+S3_PUBLIC_BASE_URL=http://localhost:9000/apptoon ./gradlew bootRun
+# 회차 업로드 → 이미지가 MinIO에 저장되고 url이 http://localhost:9000/apptoon/{key} 로 내려감
+```
+MinIO 콘솔: http://localhost:9001 (minioadmin/minioadmin).
 
 ---
 

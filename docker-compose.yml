@@ -17,5 +17,33 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # S3 호환 오브젝트 스토리지(로컬 개발용). 운영은 R2/AWS S3 등으로 대체.
+  minio:
+    image: minio/minio
+    container_name: apptoon-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"      # S3 API
+      - "9001:9001"      # 웹 콘솔
+    volumes:
+      - apptoon-minio-data:/data
+    restart: unless-stopped
+
+  # 버킷 생성 + 익명 다운로드 허용(이미지 public read). 한 번 실행 후 종료.
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do echo 'waiting for minio'; sleep 1; done;
+      mc mb -p local/apptoon;
+      mc anonymous set download local/apptoon;
+      "
+
 volumes:
   apptoon-db-data:
+  apptoon-minio-data:
