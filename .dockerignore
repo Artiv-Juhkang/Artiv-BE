@@ -1,0 +1,10 @@
+build/
+.gradle/
+.git/
+.idea/
+storage/
+graphify-out/
+.env
+*.iml
+.DS_Store
+docs/
