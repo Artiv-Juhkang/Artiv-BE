@@ -12,16 +12,20 @@ public record EpisodeDetailResponse(
         String title,
         EpisodeStatus status,
         Instant publishAt,
-        List<EpisodeImageResponse> images
+        List<EpisodeImageResponse> images,
+        long likeCount,
+        boolean liked
 ) {
 
-    public static EpisodeDetailResponse of(Episode episode, List<EpisodeImage> images) {
+    public static EpisodeDetailResponse of(Episode episode, List<EpisodeImage> images, long likeCount, boolean liked) {
         return new EpisodeDetailResponse(
                 episode.getEpisodeNo(),
                 episode.getTitle(),
                 episode.getStatus(),
                 episode.getPublishAt(),
-                images.stream().map(EpisodeImageResponse::of).toList()
+                images.stream().map(EpisodeImageResponse::of).toList(),
+                likeCount,
+                liked
         );
     }
 }

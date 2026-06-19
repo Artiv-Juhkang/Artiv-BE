@@ -31,6 +31,7 @@ public class EpisodeService {
 
     private final EpisodeRepository episodeRepository;
     private final EpisodeImageRepository episodeImageRepository;
+    private final EpisodeLikeRepository episodeLikeRepository;
     private final SeriesRepository seriesRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
@@ -93,7 +94,27 @@ public class EpisodeService {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
         List<EpisodeImage> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId());
-        return EpisodeDetailResponse.of(episode, images);
+        long likeCount = episodeLikeRepository.countByEpisodeId(episode.getId());
+        boolean liked = episodeLikeRepository.existsByUserIdAndEpisodeId(viewerId, episode.getId());
+        return EpisodeDetailResponse.of(episode, images, likeCount, liked);
+    }
+
+    @Transactional
+    public void like(Long userId, Long seriesId, int episodeNo) {
+        Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (episodeLikeRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
+            return; // 멱등: 이미 좋아요면 그대로
+        }
+        User user = userRepository.getReferenceById(userId);
+        episodeLikeRepository.save(EpisodeLike.create(user, episode));
+    }
+
+    @Transactional
+    public void unlike(Long userId, Long seriesId, int episodeNo) {
+        Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        episodeLikeRepository.deleteByUserIdAndEpisodeId(userId, episode.getId());
     }
 
     /** 비공개 작품은 작가 본인·ADMIN만 접근, 그 외에는 존재를 숨겨 404. */

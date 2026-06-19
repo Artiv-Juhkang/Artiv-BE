@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
+import com.juhkang.apptoon.domain.auth.AuthSupport;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
-import com.juhkang.apptoon.domain.user.Role;
 import com.juhkang.apptoon.global.dto.IdResponse;
 import com.juhkang.apptoon.global.dto.PageResponse;
 
@@ -63,12 +63,6 @@ public class SeriesController {
     public SeriesDetailResponse detail(@AuthenticationPrincipal Long userId,
                                        @PathVariable Long id,
                                        Authentication authentication) {
-        return seriesService.getDetail(id, userId, hasAdminRole(authentication));
-    }
-
-    private boolean hasAdminRole(Authentication authentication) {
-        String adminAuthority = "ROLE_" + Role.ADMIN.name();
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals(adminAuthority));
+        return seriesService.getDetail(id, userId, AuthSupport.isAdmin(authentication));
     }
 }
