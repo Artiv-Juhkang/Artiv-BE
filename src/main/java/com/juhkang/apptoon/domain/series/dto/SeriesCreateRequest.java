@@ -15,6 +15,7 @@ public record SeriesCreateRequest(
         String description,
         @NotNull AgeRating ageRating,
         @NotNull SeriesStatus status,
-        @NotEmpty Set<DayOfWeek> publishDays
+        @NotEmpty Set<DayOfWeek> publishDays,
+        Boolean adultOnly
 ) {
 }

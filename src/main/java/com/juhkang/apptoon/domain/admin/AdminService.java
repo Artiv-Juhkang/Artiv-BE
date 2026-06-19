@@ -44,4 +44,11 @@ public class AdminService {
         series.changeVisibility(visible);
         return SeriesResponse.of(series);
     }
+
+    public SeriesResponse changeSeriesAdultOnly(Long seriesId, boolean adultOnly) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        series.changeAdultOnly(adultOnly);
+        return SeriesResponse.of(series);
+    }
 }

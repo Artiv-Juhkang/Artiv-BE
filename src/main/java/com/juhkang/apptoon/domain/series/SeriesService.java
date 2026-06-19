@@ -4,6 +4,7 @@ import java.time.DayOfWeek;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,14 +44,16 @@ public class SeriesService {
                 author,
                 request.ageRating(),
                 request.status(),
-                request.publishDays()
+                request.publishDays(),
+                Boolean.TRUE.equals(request.adultOnly())
         );
         return seriesRepository.save(series).getId();
     }
 
     public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, String keyword,
-                                                       Pageable pageable) {
-        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, keyword, pageable)
+                                                       Boolean adultOnly, SeriesSort sort, Pageable pageable) {
+        Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort());
+        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, keyword, adultOnly, sorted)
                 .map(SeriesSummaryResponse::of);
         return PageResponse.from(page);
     }

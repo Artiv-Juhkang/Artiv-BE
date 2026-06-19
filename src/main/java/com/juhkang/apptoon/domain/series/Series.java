@@ -6,6 +6,8 @@ import java.util.Set;
 
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.global.entity.BaseEntity;
+import com.juhkang.apptoon.global.exception.BusinessException;
+import com.juhkang.apptoon.global.exception.ErrorCode;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -61,27 +63,50 @@ public class Series extends BaseEntity {
     @Column(nullable = false)
     private boolean visible = true;
 
+    @Column(nullable = false)
+    private boolean adultOnly = false;
+
     private Series(String title, String description, User author, AgeRating ageRating, SeriesStatus status,
-                   Set<DayOfWeek> publishDays) {
+                   Set<DayOfWeek> publishDays, boolean adultOnly) {
         this.title = title;
         this.description = description;
         this.author = author;
         this.ageRating = ageRating;
         this.status = status;
         this.publishDays = new HashSet<>(publishDays);
+        this.adultOnly = adultOnly;
+        validateAdultConsistency();
     }
 
     public static Series create(String title, String description, User author, AgeRating ageRating,
                                 SeriesStatus status, Set<DayOfWeek> publishDays) {
-        return new Series(title, description, author, ageRating, status, publishDays);
+        return create(title, description, author, ageRating, status, publishDays, false);
+    }
+
+    public static Series create(String title, String description, User author, AgeRating ageRating,
+                                SeriesStatus status, Set<DayOfWeek> publishDays, boolean adultOnly) {
+        return new Series(title, description, author, ageRating, status, publishDays, adultOnly);
     }
 
     public void changeAgeRating(AgeRating ageRating) {
         this.ageRating = ageRating;
+        validateAdultConsistency();
     }
 
     public void changeVisibility(boolean visible) {
         this.visible = visible;
+    }
+
+    public void changeAdultOnly(boolean adultOnly) {
+        this.adultOnly = adultOnly;
+        validateAdultConsistency();
+    }
+
+    /** 불변식: 성인 전용(adultOnly)은 연령등급이 AGE_19 여야 한다. */
+    private void validateAdultConsistency() {
+        if (adultOnly && ageRating != AgeRating.AGE_19) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
     }
 
     /** 이 작품의 작가 본인인지. 비공개·미발행 프리뷰 권한 판정에 사용. */

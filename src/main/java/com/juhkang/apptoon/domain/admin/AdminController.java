@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.juhkang.apptoon.domain.admin.dto.AdultOnlyUpdateRequest;
 import com.juhkang.apptoon.domain.admin.dto.AgeRatingUpdateRequest;
 import com.juhkang.apptoon.domain.admin.dto.RoleUpdateRequest;
 import com.juhkang.apptoon.domain.admin.dto.VisibilityUpdateRequest;
@@ -37,5 +38,10 @@ public class AdminController {
     @PatchMapping("/series/{seriesId}/visibility")
     public SeriesResponse changeVisibility(@PathVariable Long seriesId, @Valid @RequestBody VisibilityUpdateRequest request) {
         return adminService.changeSeriesVisibility(seriesId, request.visible());
+    }
+
+    @PatchMapping("/series/{seriesId}/adult-only")
+    public SeriesResponse changeAdultOnly(@PathVariable Long seriesId, @Valid @RequestBody AdultOnlyUpdateRequest request) {
+        return adminService.changeSeriesAdultOnly(seriesId, request.adultOnly());
     }
 }

@@ -17,6 +17,7 @@ public record SeriesResponse(
         SeriesStatus status,
         Set<DayOfWeek> publishDays,
         boolean visible,
+        boolean adultOnly,
         Instant createdAt
 ) {
 
@@ -30,6 +31,7 @@ public record SeriesResponse(
                 series.getStatus(),
                 series.getPublishDays(),
                 series.isVisible(),
+                series.isAdultOnly(),
                 series.getCreatedAt()
         );
     }

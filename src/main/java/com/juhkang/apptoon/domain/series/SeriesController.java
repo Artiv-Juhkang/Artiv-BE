@@ -48,8 +48,10 @@ public class SeriesController {
             @RequestParam(required = false) DayOfWeek day,
             @RequestParam(required = false) AgeRating ageRating,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean adultOnly,
+            @RequestParam(defaultValue = "LATEST") SeriesSort sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        return seriesService.getList(day, ageRating, keyword, pageable);
+        return seriesService.getList(day, ageRating, keyword, adultOnly, sort, pageable);
     }
 
     @GetMapping("/mine")

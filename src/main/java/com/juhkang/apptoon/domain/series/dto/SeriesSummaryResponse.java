@@ -10,7 +10,8 @@ public record SeriesSummaryResponse(
         String authorNickname,
         AgeRating ageRating,
         SeriesStatus status,
-        boolean visible
+        boolean visible,
+        boolean adultOnly
 ) {
 
     public static SeriesSummaryResponse of(Series series) {
@@ -20,7 +21,8 @@ public record SeriesSummaryResponse(
                 series.getAuthor().getNickname(),
                 series.getAgeRating(),
                 series.getStatus(),
-                series.isVisible()
+                series.isVisible(),
+                series.isAdultOnly()
         );
     }
 }
