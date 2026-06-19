@@ -140,7 +140,7 @@ AppToon은 웹툰을 **올리고(작가)·읽고(독자)·관리하는(운영자
 
 ### 3.5 개인화 (personalization)
 
-> ⚠️ **가드 범위(현재 동작)**: 구독·읽음·북마크·좋아요는 회차 존재 여부(404)만 확인하고 비공개(`visible`)·연령(19금) 가드는 적용하지 않는다. 회차 상세/목록은 겹겹 가드되지만, `episodeNo`만 알면 비공개·성인 작품에도 좋아요·북마크·읽음 기록이 가능하다 — 콘텐츠 노출은 없고 카운터·개인 기록만 남는다. 강화하려면 `like`/`markRead`/`bookmark`에 series visible·연령 가드를 추가해야 한다.
+> ✅ **가드**: 읽음·북마크·좋아요는 회차 상세와 동일하게 비공개(작가 본인만)·19금(만 19세 이상만) 가드를 적용한다(`SeriesAccessChecker.verifyInteractable`). `episodeNo`만 알아도 비공개·성인 작품엔 404/`ADULT_ONLY`로 차단된다. (구독은 작품 단위라 별도 — 현재 미가드.)
 
 - **구독** `POST /api/series/{seriesId}/subscription` → `201` / **구독 취소** `DELETE` → `204`
   - 사용자-작품 멱등(유니크 `uq_subscription_user_series`). 없는 작품 구독 시 `ENTITY_NOT_FOUND`.

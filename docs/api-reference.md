@@ -204,7 +204,7 @@ AppToon 백엔드 REST API의 **전수 레퍼런스**. 모든 엔드포인트·�
 
 ### 2.5 개인화 / 소셜 (Personalization) — 경로 혼재
 
-> ⚠️ 구독·읽음·북마크·좋아요는 회차 존재(404)만 확인하며 비공개·연령 가드가 **없다**(상세/목록과 달리). `episodeNo`만 알면 비공개·성인 작품에도 가능 — 콘텐츠 노출은 없음(카운터·개인기록만).
+> ✅ 읽음·북마크·좋아요는 회차 상세와 동일하게 비공개(작가만)·19금(성인만) 가드를 적용한다(`SeriesAccessChecker`) — 비인가 상호작용은 404/`ADULT_ONLY`. (구독은 작품 단위라 별도.)
 
 근거: `PersonalizationController.java`, `PersonalizationService.java`.
 

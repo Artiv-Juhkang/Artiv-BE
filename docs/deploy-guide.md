@@ -31,7 +31,7 @@
 ### 배포 전 반드시 처리해야 할 것 ⚠️
 | 항목 | 현재 | 운영에서 해야 할 일 |
 |---|---|---|
-| **Dockerfile** | 루트에 **없음** (아래 1번에서 새로 추가) | `Dockerfile` + `.dockerignore` 생성 |
+| **Dockerfile** | 루트에 **있음**(`Dockerfile` + `.dockerignore`, docker build 검증 완료) | 그대로 사용 |
 | **이미지 저장** | 로컬 `storage/` 폴더 | **오브젝트 스토리지(S3/R2)** — 컨테이너는 재시작 시 디스크 초기화 → 로컬 저장은 이미지가 사라진다. 멀티 인스턴스면 로컬 디스크는 아예 불가(인스턴스 간 공유 안 됨) → **S3 사실상 필수** |
 | **DB** | 로컬 Docker Postgres(`devpass`) | 관리형 Postgres(RDS/Supabase/Neon/PaaS 애드온) |
 | **JWT_SECRET** | dev는 `application-dev.yml`가 기본값 덧씌움 | **운영 전용 강한 키**. 베이스 `application.yml`의 `${JWT_SECRET}`엔 기본값이 없어 dev 프로파일이 아니면 미주입 시 **기동 실패** |
@@ -42,7 +42,7 @@
 
 ## 1. 빌드 & 컨테이너화 (Dockerfile 신규 작성)
 
-> **현재 프로젝트 루트에 `Dockerfile`과 `.dockerignore`가 없다.** 아래 파일을 새로 만들어야 한다. 대부분의 PaaS는 Gradle 프로젝트를 자동 감지해 우회할 수 있지만, 빌드 재현성·이미지 슬림화·컨텍스트 비대 방지를 위해 실제 파일을 두는 것을 권장한다.
+> **프로젝트 루트에 `Dockerfile`(멀티스테이지, JDK 25)과 `.dockerignore`가 이미 있다**(`docker build` 검증 완료, 이미지 ~641MB). 아래는 그 내용이다.
 
 ### 로컬에서 jar 확인
 ```bash
@@ -149,7 +149,7 @@ Railway 예시. Render/Fly.io도 흐름은 동일하다(차이는 끝에 정리)
 ### 4-1. 리포 연결
 1. https://railway.app 가입(GitHub 로그인).
 2. **New Project → Deploy from GitHub repo** → `AppToon` 리포 선택.
-3. Railway가 루트의 `Dockerfile`을 감지해 빌드한다(1번에서 추가한 파일). Dockerfile이 없으면 Nixpacks가 Gradle을 자동 감지하지만, Java 25/`bootJar` 안정성을 위해 Dockerfile 권장.
+3. Railway가 루트의 `Dockerfile`을 감지해 빌드한다(리포에 포함됨). Java 25/`bootJar` 안정성을 위해 Dockerfile을 사용한다.
 
 ### 4-2. Postgres 애드온 추가
 1. 프로젝트 캔버스에서 **New → Database → Add PostgreSQL**.
@@ -395,7 +395,7 @@ RN Expo 앱은 백엔드와 **독립적으로** EAS Build → 앱스토어/플�
 ---
 
 ## 요약: 가장 빠른 길
-1. **`Dockerfile` + `.dockerignore` 추가**(1번 — 현재 리포에 없음) →
+1. **`Dockerfile` + `.dockerignore`**(1번 — 리포에 포함됨, 빌드 검증 완료) →
 2. **이미지 스토리지 결정**: S3/R2 버킷 생성 + `STORAGE_TYPE=s3` & `S3_*` 주입(권장), 또는 단일 인스턴스 + 영속 볼륨 `STORAGE_ROOT`(6번) →
 3. **Railway에 GitHub 연결 + Postgres 애드온 + 환경변수 표**(트랙 A, 4번) →
 4. 발급된 **HTTPS 주소로 외부 공개** → 5. **스모크 테스트**(10번).
