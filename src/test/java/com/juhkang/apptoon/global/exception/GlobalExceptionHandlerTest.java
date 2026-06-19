@@ -14,6 +14,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
@@ -52,6 +53,22 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"));
     }
 
+    @Test
+    void 깨진_JSON_바디는_500이_아니라_400_INVALID_INPUT이다() throws Exception {
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ this is not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
+    @Test
+    void 파라미터_타입_불일치는_500이_아니라_400_INVALID_INPUT이다() throws Exception {
+        mockMvc.perform(get("/test/typed").param("value", "not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
     @RestController
     static class TestController {
         @PostMapping("/test/validate")
@@ -62,6 +79,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/business")
         String business() {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+
+        @GetMapping("/test/typed")
+        String typed(@RequestParam int value) {
+            return "ok";
         }
     }
 
