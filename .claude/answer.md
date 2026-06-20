@@ -873,6 +873,36 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 18 — 문의(Inquiry) 도메인 ✅ 완료 (커밋: `feat: STEP 18 문의 도메인 ...`)
+
+> 독자·작가가 관리자에게 문의(종류·내용·이미지 복수)를 보내고 관리자가 답변·상태 관리. 한 도메인을 **수직 슬라이스 한 묶음**(마이그레이션→엔티티→리포지토리→서비스→컨트롤러 2개→콘솔 UI→통합 테스트)으로 구현. 89개 테스트 GREEN.
+
+### 1) 멀티에이전트로 "설계 확정 → 구현 → 적대적 리뷰"
+- ultracode 워크플로로 ① 기존 패턴 6개 병렬 매핑 → 종합 설계 → 보안/데이터/UX 3렌즈 적대적 비평, ② 구현 후 다시 리뷰 워크플로(4차원 발견 → 각 발견 반박 검증). **설계 단계 비평이 IDOR·DoS·권한 3개 high를 미리 잡아** 구현에 반영. 단, 비평 에이전트는 코드를 추정하기도 해서(없는 `ImageStorageService.store(seriesId,episodeNo)` 시그니처 가정 등) **실제 코드로 직접 검증 후 채택**하는 게 핵심.
+
+### 2) TDD — 통합 플로우 먼저(RED), 함정 하나
+- `InquiryFlowTest`(독자 제출→목록/상세, 타인 403, 관리자 필터/답변, 삭제 등 10케이스)를 먼저 작성해 RED 확인 후 구현. **함정**: 테스트에서 `ObjectMapper`를 autowire했더니 컨텍스트가 `NoSuchBeanDefinitionException`으로 통째로 실패 — "엉뚱한 RED". 응답 id 파싱은 `com.jayway.jsonpath.JsonPath`(이미 테스트 클래스패스)로 교체해 해결. **RED는 "기대한 이유"로 실패해야 한다.**
+
+### 3) `ddl-auto: validate` — 엔티티 타입이 스키마와 일치해야
+- Hibernate가 스키마를 검증만 하므로 `@Column(length=…)`이 Flyway 컬럼과 안 맞으면 부팅 실패. content를 `text` 대신 **`varchar(5000)`**로 둬 검증 마찰을 피함(프로젝트가 varchar 일색). enum은 `varchar(20)` + `@Enumerated(STRING)`.
+
+### 4) OSIV off에서 LAZY는 "서비스 트랜잭션 안에서" 평탄화
+- `open-in-view: false`라 컨트롤러에서 LAZY 접근하면 터진다([[apptoon-lazy-serialization-gotcha]]). 그래서 **DTO 매핑을 서비스 `@Transactional` 안에서** 수행(세션 열림 → LAZY user/images 로드). `answer()`/`changeStatus()`는 더티체킹으로 flush되고, 반환 `InquiryAdminDetailResponse`도 같은 트랜잭션 안에서 user를 읽어 안전. 관리자 목록은 `join fetch i.user`로 N+1 회피.
+
+### 5) 이미지 파이프라인 재사용 — 정밀 수정(오버로드)
+- `ImageStorageService`가 회차 전용(`store(seriesId, episodeNo, …)`, 키 `{seriesId}/{episodeNo}/{order}.ext`)이었다. 내부를 **keyPrefix 기반**으로 일반화하고 기존 메서드는 `store(seriesId+"/"+episodeNo, …)`로 위임 → **기존 호출부 0 변경**(정밀 수정). 문의는 prefix `inquiries/{id}/{uuid}`.
+
+### 6) 보안 설계 메모
+- **IDOR**: `getMineDetail`은 `inquiry.isOwnedBy(userId)`(=`user.getId().equals(userId)`, 프록시 getId만) 검증 + 목록은 `findByUserId`로 SQL 격리. userId는 `@AuthenticationPrincipal`에서만(쿼리파라미터 금지).
+- **이미지 URL 열거**: 키에 `UUID.randomUUID()`를 넣어 추측 불가(서빙은 기존 `/files` 정적 유지).
+- **관리자 게이팅**: `SecurityConfig`는 `/api/admin/**`을 따로 막지 않고 `anyRequest().authenticated()`만 — 그래서 **컨트롤러 `@PreAuthorize("hasRole('ADMIN')")`**(메서드 시큐리티)로 보호. 비관리자 403 테스트로 회귀 방지.
+- **동적 필터**: 관리자 목록 `(:type is null or i.type = :type) and (:status is null or i.status = :status)` — enum null 파라미터도 JPQL에서 정상 동작(우려했으나 OK).
+
+### 7) 알아둘 트레이드오프
+- `ObjectStorage`에 `delete()`가 없어 문의 삭제 시 **DB 행은 cascade 정리되지만 스토리지 파일은 고아로 남는다**(에피소드와 동일 정책). 정리 배치/`delete()` 추가는 향후 과제.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
