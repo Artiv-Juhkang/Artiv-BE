@@ -5,6 +5,8 @@
   const AGE = { ALL: '전체', AGE_12: '12세', AGE_15: '15세', AGE_19: '19세' };
   const STATUS = { ONGOING: '연재중', COMPLETED: '완결', HIATUS: '휴재' };
   const DAYS = [['MONDAY','월'],['TUESDAY','화'],['WEDNESDAY','수'],['THURSDAY','목'],['FRIDAY','금'],['SATURDAY','토'],['SUNDAY','일']];
+  const ITYPE = { ACCOUNT: '계정', PAYMENT: '결제', CONTENT: '콘텐츠·신고', CREATOR: '작가·작품', BUG: '오류', ETC: '기타' };
+  const ISTATUS = { PENDING: '대기', ANSWERED: '답변완료', CLOSED: '종료' };
 
   const state = {
     token: localStorage.getItem('apptoon_token') || null,
@@ -153,9 +155,9 @@
   // ====================================================================
   function navItems() {
     if (state.user.role === 'ADMIN') {
-      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리']];
+      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리']];
     }
-    return [['dashboard', '내 작품'], ['create', '작품 등록']];
+    return [['dashboard', '내 작품'], ['create', '작품 등록'], ['inquiries', '문의']];
   }
 
   function renderShell(inner) {
@@ -245,6 +247,8 @@
     if (v === 'episodes') return viewEpisodes();
     if (v === 'admin-series') return viewAdminSeries();
     if (v === 'admin-users') return viewAdminUsers();
+    if (v === 'admin-inquiries') return viewAdminInquiries();
+    if (v === 'inquiries') return viewMyInquiries();
   }
 
   // ====================================================================
@@ -580,6 +584,208 @@
         } catch (err) { toast(errMsg(err), 'err'); }
       }
     });
+  }
+
+  // ====================================================================
+  // 문의 — 공통
+  // ====================================================================
+  function statusTag(s) {
+    const cls = s === 'ANSWERED' ? 'tag--on' : (s === 'CLOSED' ? 'tag--off' : '');
+    return `<span class="tag ${cls}">${ISTATUS[s] || s}</span>`;
+  }
+  function imageGallery(images) {
+    if (!images || !images.length) return '';
+    return `<div class="iq-gallery">${images.map((im) => `<a href="${im.url}" target="_blank" rel="noopener"><img src="${im.url}" alt="" loading="lazy"></a>`).join('')}</div>`;
+  }
+
+  // ====================================================================
+  // 작가/사용자 — 내 문의
+  // ====================================================================
+  function viewMyInquiries() {
+    setMain(`<div class="page-head"><div><span class="eyebrow">Creator</span><h1>문의</h1><p>관리자에게 문의하고 답변을 확인하세요</p></div>
+      <button class="btn btn--accent" id="iq-new">＋ 문의하기</button></div>
+      <div id="iq-list">${loading}</div>`);
+    $('#iq-new').addEventListener('click', openCreateInquiry);
+    loadMyInquiries();
+  }
+  async function loadMyInquiries() {
+    const list = $('#iq-list'); if (list) list.innerHTML = loading;
+    try {
+      const page = await api('GET', '/api/me/inquiries?size=50');
+      $('#iq-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(myInquiryRow).join('')}</div>`
+        : emptyBox('문의가 없어요', '“문의하기”로 첫 문의를 남겨보세요.');
+      $('#iq-list').addEventListener('click', onMyInquiryClick);
+    } catch (e) { $('#iq-list').innerHTML = errBox(e); }
+  }
+  function myInquiryRow(q) {
+    const when = q.createdAt ? new Date(q.createdAt).toLocaleDateString('ko-KR') : '';
+    return `<div class="row" data-id="${q.id}">
+      <div class="row__main"><div class="t">${esc(q.title)}</div><div class="s">${ITYPE[q.type] || q.type} · ${when}</div></div>
+      <div class="row__side">${statusTag(q.status)}<button class="btn btn--sm" data-act="open">보기</button></div></div>`;
+  }
+  function onMyInquiryClick(e) {
+    const row = e.target.closest('.row');
+    if (row && e.target.closest('[data-act="open"]')) openMyInquiry(Number(row.dataset.id));
+  }
+
+  function openCreateInquiry() {
+    uploadFiles = []; uploadSeq = 0;
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<form class="modal panel" id="iqForm">
+      <h2>문의하기</h2><p class="sub">관리자에게 전달됩니다</p>
+      <div class="field"><label for="iq-type">종류</label><select id="iq-type">
+        ${Object.entries(ITYPE).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="iq-title">제목</label><input id="iq-title" maxlength="255" placeholder="제목"></div>
+      <div class="field"><label for="iq-content">내용</label><textarea id="iq-content" placeholder="문의 내용을 적어주세요"></textarea></div>
+      <div class="field"><label>이미지 (선택 · jpg/png · 최대 5장)</label>
+        <label class="upload-drop" id="u-drop"><input id="u-files" type="file" accept="image/png,image/jpeg" multiple hidden>
+          <b id="u-drop-label">클릭하거나 끌어다 놓기</b></label>
+        <div class="thumbs" id="u-thumbs"></div></div>
+      <div class="modal__actions"><button type="button" class="btn btn--sm" data-x>취소</button>
+        <button type="submit" class="btn btn--accent btn--sm" id="iq-submit">보내기</button></div></form>`;
+    document.body.appendChild(m);
+    const filesInput = $('#u-files'), drop = $('#u-drop');
+    filesInput.addEventListener('change', () => { addFiles(filesInput.files); filesInput.value = ''; });
+    ['dragover', 'dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => {
+      e.preventDefault(); drop.classList.toggle('drag', ev === 'dragover');
+      if (ev === 'drop') addFiles(e.dataTransfer.files);
+    }));
+    $('#u-thumbs').addEventListener('click', (e) => {
+      const del = e.target.closest('[data-del]');
+      if (del) { e.preventDefault(); removeFile(Number(del.dataset.del)); }
+    });
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) closeUpload(m); });
+    $('#iqForm').addEventListener('submit', (e) => onCreateInquiry(e, m));
+    $('#iq-title').focus();
+  }
+  async function onCreateInquiry(e, m) {
+    e.preventDefault();
+    const type = $('#iq-type').value, title = $('#iq-title').value.trim(), content = $('#iq-content').value.trim();
+    if (!title) return toast('제목을 입력하세요', 'err');
+    if (!content) return toast('내용을 입력하세요', 'err');
+    if (uploadFiles.length > 5) return toast('이미지는 최대 5장이에요', 'err');
+    const fd = new FormData();
+    fd.append('type', type); fd.append('title', title); fd.append('content', content);
+    uploadFiles.forEach((it) => fd.append('images', it.file));
+    const btn = $('#iq-submit'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      await api('POST', '/api/me/inquiries', { form: fd });
+      toast('문의를 보냈어요', 'ok');
+      closeUpload(m); loadMyInquiries();
+    } catch (err) { toast(errMsg(err), 'err'); btn.disabled = false; btn.textContent = '보내기'; }
+  }
+
+  async function openMyInquiry(id) {
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel">${loading}</div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    try {
+      const q = await api('GET', `/api/me/inquiries/${id}`);
+      m.querySelector('.modal').innerHTML = `
+        <h2>${esc(q.title)}</h2>
+        <div class="card__meta" style="margin-bottom:14px"><span class="tag">${ITYPE[q.type] || q.type}</span>${statusTag(q.status)}</div>
+        <div class="iq-body">${esc(q.content)}</div>
+        ${imageGallery(q.images)}
+        ${q.answer ? `<div class="iq-answer"><div class="iq-answer__h">관리자 답변</div>${esc(q.answer)}</div>`
+          : '<p class="hint" style="margin-top:14px">아직 답변이 없어요.</p>'}
+        <div class="modal__actions" style="justify-content:space-between">
+          <button class="btn btn--ghost btn--sm" data-del>삭제</button>
+          <button class="btn btn--sm" data-x>닫기</button></div>`;
+      m.querySelector('[data-del]').addEventListener('click', async () => {
+        try { await api('DELETE', `/api/me/inquiries/${id}`); toast('삭제했어요', 'ok'); m.remove(); loadMyInquiries(); }
+        catch (err) { toast(errMsg(err), 'err'); }
+      });
+    } catch (e) {
+      m.querySelector('.modal').innerHTML = errBox(e) + '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>';
+    }
+  }
+
+  // ====================================================================
+  // 관리자 — 문의 관리
+  // ====================================================================
+  let adminInquiryStatus = '';
+  let adminInquiryType = '';
+  function viewAdminInquiries() {
+    const chips = [['', '전체'], ['PENDING', '대기'], ['ANSWERED', '답변완료'], ['CLOSED', '종료']];
+    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>문의 관리</h1>
+      <p>사용자 문의를 확인하고 답변하세요</p></div></div>
+      <div class="filters" id="aiq-filter">
+        ${chips.map(([v, l]) => `<button class="chip" data-v="${v}" ${v === adminInquiryStatus ? 'aria-current="true"' : ''}>${l}</button>`).join('')}
+        <select id="aiq-type"><option value="">전체 종류</option>
+          ${Object.entries(ITYPE).map(([k, v]) => `<option value="${k}" ${k === adminInquiryType ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      </div>
+      <div id="aiq-list">${loading}</div>`);
+    $('#aiq-filter').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]'); if (b) { adminInquiryStatus = b.dataset.v; viewAdminInquiries(); }
+    });
+    $('#aiq-type').addEventListener('change', (e) => { adminInquiryType = e.target.value; loadAdminInquiries(); });
+    loadAdminInquiries();
+  }
+  async function loadAdminInquiries() {
+    const list = $('#aiq-list'); if (list) list.innerHTML = loading;
+    try {
+      const q = `size=50${adminInquiryStatus ? `&status=${adminInquiryStatus}` : ''}${adminInquiryType ? `&type=${adminInquiryType}` : ''}`;
+      const page = await api('GET', `/api/admin/inquiries?${q}`);
+      $('#aiq-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(adminInquiryRow).join('')}</div>`
+        : emptyBox('문의가 없어요', '필터 조건을 바꿔보세요.');
+      $('#aiq-list').addEventListener('click', onAdminInquiryClick);
+    } catch (e) { $('#aiq-list').innerHTML = errBox(e); }
+  }
+  function adminInquiryRow(q) {
+    const when = q.createdAt ? new Date(q.createdAt).toLocaleDateString('ko-KR') : '';
+    return `<div class="row" data-id="${q.id}"><span class="row__no mono">#${q.id}</span>
+      <div class="row__main"><div class="t">${esc(q.title)}</div>
+        <div class="s">${esc(q.authorNickname)} · ${ROLE_LABEL[q.authorRole] || q.authorRole} · ${when}</div></div>
+      <div class="row__side"><span class="tag">${ITYPE[q.type] || q.type}</span>${statusTag(q.status)}
+        <button class="btn btn--sm" data-act="open">상세</button></div></div>`;
+  }
+  function onAdminInquiryClick(e) {
+    const row = e.target.closest('.row');
+    if (row && e.target.closest('[data-act="open"]')) openAdminInquiry(Number(row.dataset.id));
+  }
+  async function openAdminInquiry(id) {
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel">${loading}</div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    try {
+      const q = await api('GET', `/api/admin/inquiries/${id}`);
+      m.querySelector('.modal').innerHTML = `
+        <h2>${esc(q.title)}</h2>
+        <p class="sub">${esc(q.authorNickname)} · ${esc(q.authorEmail)} · ${ROLE_LABEL[q.authorRole] || q.authorRole}</p>
+        <div class="card__meta" style="margin-bottom:14px"><span class="tag">${ITYPE[q.type] || q.type}</span>${statusTag(q.status)}</div>
+        <div class="iq-body">${esc(q.content)}</div>
+        ${imageGallery(q.images)}
+        <hr class="divider">
+        <div class="field"><label for="aiq-answer">답변</label>
+          <textarea id="aiq-answer" maxlength="2000" placeholder="답변을 입력하세요">${esc(q.answer || '')}</textarea></div>
+        <div class="field"><label for="aiq-status">상태</label><select id="aiq-status">
+          ${['PENDING', 'ANSWERED', 'CLOSED'].map((s) => `<option value="${s}" ${s === q.status ? 'selected' : ''}>${ISTATUS[s]}</option>`).join('')}</select></div>
+        <div class="modal__actions" style="justify-content:space-between">
+          <button class="btn btn--ghost btn--sm" data-del>삭제</button>
+          <span style="display:flex;gap:8px"><button class="btn btn--sm" data-status>상태만 변경</button>
+            <button class="btn btn--accent btn--sm" data-answer>답변 저장</button></span></div>`;
+      const refresh = () => { m.remove(); loadAdminInquiries(); };
+      m.querySelector('[data-answer]').addEventListener('click', async () => {
+        const answer = $('#aiq-answer', m).value.trim();
+        if (!answer) return toast('답변을 입력하세요', 'err');
+        try { await api('PATCH', `/api/admin/inquiries/${id}/answer`, { json: { answer } }); toast('답변을 저장했어요', 'ok'); refresh(); }
+        catch (err) { toast(errMsg(err), 'err'); }
+      });
+      m.querySelector('[data-status]').addEventListener('click', async () => {
+        try { await api('PATCH', `/api/admin/inquiries/${id}/status`, { json: { status: $('#aiq-status', m).value } }); toast('상태를 변경했어요', 'ok'); refresh(); }
+        catch (err) { toast(errMsg(err), 'err'); }
+      });
+      m.querySelector('[data-del]').addEventListener('click', async () => {
+        try { await api('DELETE', `/api/admin/inquiries/${id}`); toast('삭제했어요', 'ok'); refresh(); }
+        catch (err) { toast(errMsg(err), 'err'); }
+      });
+    } catch (e) {
+      m.querySelector('.modal').innerHTML = errBox(e) + '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>';
+    }
   }
 
   // ---- helpers ----

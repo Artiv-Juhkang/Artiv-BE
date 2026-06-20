@@ -43,17 +43,22 @@ public class ImageStorageService {
     }
 
     public List<Stored> store(Long seriesId, int episodeNo, List<MultipartFile> images) {
+        return store(seriesId + "/" + episodeNo, images);
+    }
+
+    /** keyPrefix 하위에 {order}.{ext}로 저장한다(예: inquiries/{id}/{uuid}). 회차/문의가 공유. */
+    public List<Stored> store(String keyPrefix, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_IMAGE);
         }
         List<Stored> result = new ArrayList<>();
         for (int order = 0; order < images.size(); order++) {
-            result.add(storeOne(seriesId, episodeNo, order, images.get(order)));
+            result.add(storeOne(keyPrefix, order, images.get(order)));
         }
         return result;
     }
 
-    private Stored storeOne(Long seriesId, int episodeNo, int order, MultipartFile file) {
+    private Stored storeOne(String keyPrefix, int order, MultipartFile file) {
         validate(file);
         try {
             BufferedImage source = ImageIO.read(file.getInputStream());
@@ -65,7 +70,7 @@ public class ImageStorageService {
                     : source;
 
             String ext = "image/png".equals(file.getContentType()) ? "png" : "jpg";
-            String key = seriesId + "/" + episodeNo + "/" + order + "." + ext;
+            String key = keyPrefix + "/" + order + "." + ext;
 
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             ImageIO.write(resized, ext, bytes);
