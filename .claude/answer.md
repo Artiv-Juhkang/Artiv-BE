@@ -835,6 +835,44 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 17 — 콘솔 디자인 시스템(라이트/다크) + 설정 모달 ✅ 완료 (커밋: `feat: 콘솔 디자인 "작업실" 리스킨 ...`)
+
+> 기존 만화-브루탈리즘(잉크 패널+버밀리언) 콘솔을 "작업실" 컨셉으로 리스킨하고, **하나의 디자인 시스템을 라이트/다크 두 스킨**으로 만들었다. 정적 자산(html/css/js)만 바뀌고 백엔드는 무변경 → 79개 테스트 그대로 GREEN.
+
+### 1) 라이트/다크는 "두 디자인"이 아니라 "한 시스템 두 스킨"
+- 사용자가 "라이트=A안, 다크=C안" 섞기를 제안 → **반대**했다. 토글은 같은 정체성을 표면색만 바꾸는 것. 서로 다른 컨셉을 끼우면 버튼 하나에 두 브랜드가 튀어나오고 유지보수가 2배.
+- 구현 핵심: **CSS 커스텀 프로퍼티(토큰) + `[data-theme]` 속성 선택자**.
+  ```css
+  :root, [data-theme="dark"] { --bg:#16142A; --surface:#211E3C; --amber-ink:#FFB661; ... }
+  [data-theme="light"]       { --bg:#F4F2EE; --surface:#FFFFFF; --amber-ink:#B26A12; ... }
+  .card { background:var(--surface); color:var(--text); }   /* 컴포넌트는 토큰만 참조 */
+  ```
+  컴포넌트 CSS는 색을 직접 쓰지 않고 토큰만 본다 → 스킨 추가/변경이 토큰 블록 한 곳에서 끝난다.
+- **대비(contrast) 보정 토큰**: 같은 "앰버"라도 다크에선 글자색으로 써도 밝아서 OK(`--amber-ink:#FFB661`), 라이트에선 흰 배경에 안 보이니 글자용은 진한 번트앰버(`#B26A12`)로 분리. "칠하는 색"과 "글자 색"을 다른 토큰으로 가른 게 포인트.
+
+### 2) 테마 우선순위 & 플래시(FOUC) 방지
+- 우선순위: `localStorage('apptoon_theme')` 명시값 > 없으면 OS 설정(`matchMedia('(prefers-color-scheme: dark)')`). 값은 `system|light|dark` 3종. `system` 선택 시 localStorage를 **지워서** OS를 따라가게 함.
+- **첫 페인트 전 적용**: `index.html` `<head>`에 인라인 `<script>`로 data-theme를 먼저 박는다. 그래야 CSS 로드 전 잘못된 테마가 한 번 깜빡이는 FOUC를 막는다. (SPA 본 스크립트는 늦게 뜨므로 늦음)
+- 시스템 모드일 때 OS 테마가 바뀌면 `sysDark.addEventListener('change', ...)`로 실시간 반영.
+
+### 3) 설정 모달 = "있는 기능만" (YAGNI)
+- claude.ai 계정 메뉴처럼 **좌상단 사용자 정보 클릭 → 설정 모달**. 들어간 건 실제 API가 받쳐주는 것만: 내 정보(읽기 전용, `GET /api/users/me`)·테마·로그아웃.
+- 문의/비밀번호 변경/알림은 **백엔드가 없으므로 가짜 메뉴를 그리지 않았다**(죽은 UI 금지). 모달을 섹션 구조로 만들어 나중에 끼우기만 하면 되게 함.
+
+### 4) 모달 접근성 — 포커스 관리
+- 모달을 열면 `dialog.setAttribute('tabindex','-1'); dialog.focus()`로 **포커스를 모달로 이동**. 이유: ① 스크린리더가 모달을 읽게 함 ② `Esc` 키 핸들러가 확실히 동작(포커스가 모달 안에 있어야 keydown이 document로 버블링). `.modal:focus{outline:none}`로 프로그램적 포커스 링은 숨김.
+- 검증 함정: puppeteer `page.keyboard.press('Escape')`는 headless에서 탭 포커스가 없어 안 먹을 수 있다 → `el.click()`/`dispatchEvent`로 핸들러 자체가 도는지 따로 확인. **실제 브라우저에선 클릭이 포커스를 주므로 정상 동작.**
+
+### 5) 실행 중 서버에 정적 변경 반영
+- `bootRun`은 `build/resources/main`에서 정적 파일을 서빙한다(`src/main/resources` 아님). 따라서 src만 고치면 **실행 중 서버엔 안 보인다**.
+- 해결: `processResources`(= bootRun 재기동이 의존으로 실행) 또는 바뀐 파일을 `build/resources/main/static/admin/`로 직접 복사. `curl http://localhost:8080/admin/app.js | grep` 으로 반영 확인.
+
+### 6) 디자인 의사결정 메모
+- 컨셉 후보를 **Visual Companion**(탭 전환 + iframe 라이브 렌더 + 토큰 패널 HTML)으로 비교 제시 → 사용자가 C(심야 작업실) 선택. 정적 mockup은 비교용일 뿐, 채택 후 실제 SPA에 토큰을 이식했다.
+- 시그니처: **데스크 램프 앰비언트 글로우**(`.main:before` radial-gradient) + "작업 중" 카드만 앰버로 점등. 라이트/다크 모두에서 같은 시그니처가 톤만 바뀌어 유지됨.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
