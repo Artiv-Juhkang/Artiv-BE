@@ -595,7 +595,7 @@
   }
   function imageGallery(images) {
     if (!images || !images.length) return '';
-    return `<div class="iq-gallery">${images.map((im) => `<a href="${im.url}" target="_blank" rel="noopener"><img src="${im.url}" alt="" loading="lazy"></a>`).join('')}</div>`;
+    return `<div class="iq-gallery">${images.map((im) => `<a href="${esc(im.url)}" target="_blank" rel="noopener"><img src="${esc(im.url)}" alt="" loading="lazy"></a>`).join('')}</div>`;
   }
 
   // ====================================================================
@@ -655,11 +655,14 @@
       const del = e.target.closest('[data-del]');
       if (del) { e.preventDefault(); removeFile(Number(del.dataset.del)); }
     });
-    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) closeUpload(m); });
-    $('#iqForm').addEventListener('submit', (e) => onCreateInquiry(e, m));
+    const close = () => { closeUpload(m); document.removeEventListener('keydown', onKey); };
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) close(); });
+    $('#iqForm').addEventListener('submit', (e) => onCreateInquiry(e, m, close));
     $('#iq-title').focus();
   }
-  async function onCreateInquiry(e, m) {
+  async function onCreateInquiry(e, m, close) {
     e.preventDefault();
     const type = $('#iq-type').value, title = $('#iq-title').value.trim(), content = $('#iq-content').value.trim();
     if (!title) return toast('제목을 입력하세요', 'err');
@@ -672,7 +675,7 @@
     try {
       await api('POST', '/api/me/inquiries', { form: fd });
       toast('문의를 보냈어요', 'ok');
-      closeUpload(m); loadMyInquiries();
+      close(); loadMyInquiries();
     } catch (err) { toast(errMsg(err), 'err'); btn.disabled = false; btn.textContent = '보내기'; }
   }
 
@@ -680,7 +683,10 @@
     const m = document.createElement('div'); m.className = 'modal-bg';
     m.innerHTML = `<div class="modal panel">${loading}</div>`;
     document.body.appendChild(m);
-    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) close(); });
     try {
       const q = await api('GET', `/api/me/inquiries/${id}`);
       m.querySelector('.modal').innerHTML = `
@@ -694,7 +700,7 @@
           <button class="btn btn--ghost btn--sm" data-del>삭제</button>
           <button class="btn btn--sm" data-x>닫기</button></div>`;
       m.querySelector('[data-del]').addEventListener('click', async () => {
-        try { await api('DELETE', `/api/me/inquiries/${id}`); toast('삭제했어요', 'ok'); m.remove(); loadMyInquiries(); }
+        try { await api('DELETE', `/api/me/inquiries/${id}`); toast('삭제했어요', 'ok'); close(); loadMyInquiries(); }
         catch (err) { toast(errMsg(err), 'err'); }
       });
     } catch (e) {
@@ -750,7 +756,10 @@
     const m = document.createElement('div'); m.className = 'modal-bg';
     m.innerHTML = `<div class="modal panel">${loading}</div>`;
     document.body.appendChild(m);
-    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) close(); });
     try {
       const q = await api('GET', `/api/admin/inquiries/${id}`);
       m.querySelector('.modal').innerHTML = `
@@ -768,7 +777,7 @@
           <button class="btn btn--ghost btn--sm" data-del>삭제</button>
           <span style="display:flex;gap:8px"><button class="btn btn--sm" data-status>상태만 변경</button>
             <button class="btn btn--accent btn--sm" data-answer>답변 저장</button></span></div>`;
-      const refresh = () => { m.remove(); loadAdminInquiries(); };
+      const refresh = () => { close(); loadAdminInquiries(); };
       m.querySelector('[data-answer]').addEventListener('click', async () => {
         const answer = $('#aiq-answer', m).value.trim();
         if (!answer) return toast('답변을 입력하세요', 'err');

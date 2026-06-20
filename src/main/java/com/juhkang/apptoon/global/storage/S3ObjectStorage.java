@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
@@ -38,5 +39,10 @@ public class S3ObjectStorage implements ObjectStorage {
     @Override
     public String urlFor(String key) {
         return publicBaseUrl + "/" + key;
+    }
+
+    @Override
+    public void delete(String key) {
+        s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 }

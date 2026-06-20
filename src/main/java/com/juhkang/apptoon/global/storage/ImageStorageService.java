@@ -42,6 +42,11 @@ public class ImageStorageService {
         return objectStorage.urlFor(key);
     }
 
+    /** 저장된 객체를 삭제한다(없으면 무시). */
+    public void delete(String key) {
+        objectStorage.delete(key);
+    }
+
     public List<Stored> store(Long seriesId, int episodeNo, List<MultipartFile> images) {
         return store(seriesId + "/" + episodeNo, images);
     }

@@ -40,4 +40,13 @@ public class LocalObjectStorage implements ObjectStorage {
     public String urlFor(String key) {
         return "/files/" + key;
     }
+
+    @Override
+    public void delete(String key) {
+        try {
+            Files.deleteIfExists(root.resolve(key));
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.STORAGE_FAILED);
+        }
+    }
 }

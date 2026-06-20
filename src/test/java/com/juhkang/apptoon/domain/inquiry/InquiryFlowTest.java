@@ -7,10 +7,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 
@@ -200,6 +205,64 @@ class InquiryFlowTest {
     void 비관리자는_관리자_문의API에_접근할_수_없다_403() throws Exception {
         mockMvc.perform(get("/api/admin/inquiries").header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isForbidden());
+    }
+
+    private long countFiles(Path dir) throws IOException {
+        if (!Files.exists(dir)) return 0;
+        try (Stream<Path> s = Files.walk(dir)) {
+            return s.filter(Files::isRegularFile).count();
+        }
+    }
+
+    @Test
+    void 관리자가_문의를_삭제하면_이미지파일도_정리된다() throws Exception {
+        long id = submit(readerToken, "BUG", "이미지 문의", "내용", pngPart("0.png", 100, 100));
+        Path dir = Path.of("build/test-inquiry-storage/inquiries/" + id);
+        assertThat(countFiles(dir)).isGreaterThan(0);
+
+        mockMvc.perform(delete("/api/admin/inquiries/" + id).header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(countFiles(dir)).isZero();
+    }
+
+    @Test
+    void 답변을_재작성하면_마지막_답변으로_덮어쓰인다() throws Exception {
+        long id = submit(readerToken, "ETC", "재작성 문의", "내용");
+        mockMvc.perform(patch("/api/admin/inquiries/" + id + "/answer")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"첫 답변\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/admin/inquiries/" + id + "/answer")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"두 번째 답변\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/inquiries/" + id).header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("두 번째 답변"))
+                .andExpect(jsonPath("$.status").value("ANSWERED"));
+    }
+
+    @Test
+    void 관리자가_type과_status를_조합해_필터링한다() throws Exception {
+        long bug = submit(readerToken, "BUG", "버그", "내용");
+        submit(readerToken, "PAYMENT", "결제", "내용");
+        mockMvc.perform(patch("/api/admin/inquiries/" + bug + "/answer")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"처리\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/admin/inquiries").param("status", "ANSWERED")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].type").value("BUG"));
+        mockMvc.perform(get("/api/admin/inquiries").param("type", "BUG").param("status", "PENDING")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/api/admin/inquiries").param("status", "CLOSED")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     @Test

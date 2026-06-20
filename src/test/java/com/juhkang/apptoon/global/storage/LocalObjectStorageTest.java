@@ -26,4 +26,22 @@ class LocalObjectStorageTest {
 
         assertThat(Files.readAllBytes(tempDir.resolve("3/1/0.png"))).isEqualTo(content);
     }
+
+    @Test
+    void delete는_key_파일을_지운다(@TempDir Path tempDir) throws Exception {
+        LocalObjectStorage storage = new LocalObjectStorage(tempDir.toString());
+        storage.put("9/0/0.png", "x".getBytes(), "image/png");
+        assertThat(Files.exists(tempDir.resolve("9/0/0.png"))).isTrue();
+
+        storage.delete("9/0/0.png");
+
+        assertThat(Files.exists(tempDir.resolve("9/0/0.png"))).isFalse();
+    }
+
+    @Test
+    void delete는_없는_key도_조용히_무시한다(@TempDir Path tempDir) {
+        LocalObjectStorage storage = new LocalObjectStorage(tempDir.toString());
+
+        storage.delete("nope/0.png"); // 예외 없이 통과
+    }
 }

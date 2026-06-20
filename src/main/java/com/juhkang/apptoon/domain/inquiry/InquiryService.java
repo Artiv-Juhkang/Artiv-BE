@@ -121,6 +121,9 @@ public class InquiryService {
     }
 
     private void deleteWithImages(Inquiry inquiry) {
+        // 스토리지 파일 정리(고아 방지) → DB 행 삭제(cascade 안전망) → 본체 삭제
+        inquiryImageRepository.findByInquiryIdOrderBySortOrderAsc(inquiry.getId())
+                .forEach(img -> imageStorageService.delete(img.getPath()));
         inquiryImageRepository.deleteByInquiryId(inquiry.getId());
         inquiryRepository.delete(inquiry);
     }
