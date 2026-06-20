@@ -28,6 +28,19 @@
     localStorage.removeItem('apptoon_refresh');
   }
 
+  // ---- theme (라이트/다크/시스템) ----
+  const THEME_KEY = 'apptoon_theme';
+  const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const themePref = () => localStorage.getItem(THEME_KEY) || 'system';
+  const resolveTheme = (pref) => (pref === 'system' ? (sysDark.matches ? 'dark' : 'light') : pref);
+  function applyTheme() { document.documentElement.setAttribute('data-theme', resolveTheme(themePref())); }
+  function setTheme(pref) {
+    if (pref === 'system') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, pref);
+    applyTheme();
+  }
+  sysDark.addEventListener('change', () => { if (themePref() === 'system') applyTheme(); });
+
   // ---- toast ----
   let toastTimer;
   function toast(msg, kind = '') {
@@ -79,6 +92,7 @@
     app.innerHTML = `
       <div class="login">
         <form class="login__card panel" id="loginForm" novalidate>
+          <button type="button" class="login__theme" id="loginTheme" aria-label="테마 전환"></button>
           <div class="login__brand">
             <span class="login__logo">App<b>Toon</b></span>
             <span class="stamp">STUDIO</span>
@@ -97,7 +111,16 @@
         </form>
       </div>`;
     $('#loginForm').addEventListener('submit', onLogin);
+    syncLoginTheme();
+    $('#loginTheme').addEventListener('click', () => {
+      setTheme(resolveTheme(themePref()) === 'dark' ? 'light' : 'dark');
+      syncLoginTheme();
+    });
     $('#email').focus();
+  }
+  function syncLoginTheme() {
+    const b = $('#loginTheme');
+    if (b) b.textContent = resolveTheme(themePref()) === 'dark' ? '🌙' : '☀️';
   }
 
   async function onLogin(e) {
@@ -145,11 +168,15 @@
       <div class="shell">
         <aside class="side">
           <div class="side__logo">App<b>Toon</b></div>
-          <div class="side__who"><strong>${esc(state.user.nickname)}</strong><br>${esc(state.user.email)}<br>${roleStamp}</div>
+          <div class="side__brandsub">Studio · ${state.user.role === 'ADMIN' ? '관리자' : '작업실'}</div>
+          <button class="side__who" id="account" aria-haspopup="dialog" title="설정 열기">
+            <strong>${esc(state.user.nickname)}</strong>
+            <span class="em">${esc(state.user.email)}</span><br>${roleStamp}
+            <span class="cog" aria-hidden="true">⚙</span>
+          </button>
           <nav class="nav">
             ${items.map(([k, label]) => `<button data-view="${k}" ${k === state.view ? 'aria-current="true"' : ''}>${label}</button>`).join('')}
           </nav>
-          <div class="side__foot"><button class="btn btn--ghost btn--sm" id="logout" style="color:#cdcad6;border-color:#3a3744">로그아웃</button></div>
         </aside>
         <main class="main" id="main">${inner || ''}</main>
       </div>`;
@@ -157,7 +184,51 @@
       const b = e.target.closest('button[data-view]');
       if (b) { state.view = b.dataset.view; route(); }
     });
-    $('#logout').addEventListener('click', () => { clearTokens(); renderLogin(); });
+    $('#account').addEventListener('click', openSettings);
+  }
+
+  // ---- 설정 모달 (계정 · 테마) ----
+  function openSettings() {
+    const u = state.user;
+    const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('ko-KR') : '';
+    const roleStamp = u.role === 'ADMIN' ? '<span class="stamp stamp--admin">ADMIN</span>'
+      : `<span class="stamp">${u.role === 'CREATOR' ? 'CREATOR' : 'READER'}</span>`;
+    const pref = themePref();
+    const opts = [['system', '🖥️', '시스템'], ['light', '☀️', '라이트'], ['dark', '🌙', '다크']];
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel" role="dialog" aria-label="설정">
+      <h2>설정</h2><p class="sub">계정과 화면을 관리하세요</p>
+      <div class="set-sec"><h3>내 정보</h3>
+        <div class="set-me"><div class="nm">${esc(u.nickname)} ${roleStamp}</div>
+          <div class="ln">${esc(u.email)}</div><div class="ln">가입일 ${joined}</div></div></div>
+      <div class="set-sec"><h3>테마</h3>
+        <div class="seg" id="set-theme">${opts.map(([v, ic, l]) =>
+          `<button data-theme-val="${v}" ${v === pref ? 'aria-current="true"' : ''}>${ic} ${l}</button>`).join('')}</div></div>
+      <hr class="divider">
+      <div class="modal__actions" style="justify-content:space-between">
+        <button class="btn btn--ghost btn--sm" id="set-logout">로그아웃</button>
+        <button class="btn btn--sm" data-x>닫기</button>
+      </div>
+      <div class="set-foot">AppToon Studio Console</div>
+    </div>`;
+    document.body.appendChild(m);
+    const dialog = m.querySelector('.modal');
+    dialog.setAttribute('tabindex', '-1');
+    dialog.focus(); // 포커스를 모달로 이동 — 접근성 + Esc 키 동작 보장
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+    function onKey(ev) { if (ev.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    m.addEventListener('click', (e) => {
+      if (e.target === m || e.target.closest('[data-x]')) return close();
+      const t = e.target.closest('[data-theme-val]');
+      if (t) {
+        setTheme(t.dataset.themeVal);
+        m.querySelectorAll('#set-theme button').forEach((b) => b.removeAttribute('aria-current'));
+        t.setAttribute('aria-current', 'true');
+        return;
+      }
+      if (e.target.closest('#set-logout')) { close(); clearTokens(); renderLogin(); }
+    });
   }
 
   function setMain(html) { const m = $('#main'); if (m) m.innerHTML = html; }
@@ -425,7 +496,7 @@
         ${Object.entries(AGE).map(([k,v])=>`<option value="${k}" ${k===age?'selected':''}>${v}</option>`).join('')}</select></div>
       <div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button>
         <button class="btn btn--accent btn--sm" data-act="age">연령등급 변경</button></div>
-      <hr style="border:none;border-top:2px solid var(--ink);margin:18px 0">
+      <hr class="divider">
       <div class="modal__actions" style="justify-content:flex-start">
         <button class="btn btn--sm" data-act="vis-on">공개</button>
         <button class="btn btn--sm" data-act="vis-off">비공개</button>
@@ -523,6 +594,7 @@
   function boot() { route(); }
 
   async function init() {
+    applyTheme();
     if (!state.token) return renderLogin();
     try {
       state.user = await api('GET', '/api/users/me');
