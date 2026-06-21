@@ -926,6 +926,31 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 20 — 계정·프로필 + 법적 동의 + 작가 전환 신청 ✅ 완료 (커밋: `feat: STEP 20 ...`)
+
+> 회원가입/인증 전체를 설계(자체·이메일인증·OAuth·법적동의)하되 **외부 설정 0인 부분만** TDD 구현. 외부 의존(OAuth 키·이메일 SMTP)·프로덕션 하드닝(rate limit·토큰 무효화)은 설계 문서로 미룸. 115개 테스트.
+
+### 1) 멀티에이전트 설계 비평을 "취사선택"
+- 설계 워크플로의 비평(보안·법적·데이터)이 광범위했으나 상당수가 **MVP/학습 범위 밖**(Bucket4j rate limit, JWT 블랙리스트, Redis/Vault, GDPR 전면 준수) 또는 **외부 의존**. 실제 코드로 검증해 **지금 슬라이스에 맞는 것만** 반영(동의 인프라·만14세·필수동의 차단·비번변경 현재비번 확인·MyProfileResponse·작가신청 심사). **비평은 입력이지 명령이 아니다.**
+- 정정: 비평이 "birthDate nullable이라 미성년 차단 불가"라 했으나 실제 `SignupRequest.birthDate`는 이미 `@NotNull @Past` → 검증 한 줄만 추가.
+
+### 2) 가입 스키마 변경은 동반 테스트 수정 필수
+- `SignupRequest`에 `consents` 추가 → 기존 가입 테스트(`AuthFlowTest` JSON, `AuthServiceTest`의 4-arg 생성자)가 **컴파일/검증 깨짐** → 같이 수정. 스키마/계약 변경 시 호출부(특히 테스트) 동반 수정이 원칙.
+
+### 3) FK on delete cascade — 비-트랜잭션 테스트의 함정
+- `user_consents`/`creator_requests` FK 추가 후 전체 빌드에서 `SeriesDetailSerializationTest`(비-트랜잭션, 커밋 후 사용자 cleanup)가 **FK 위반으로 실패**: `AuthFlowTest`(비-트랜잭션)가 signup으로 **동의 행을 커밋**해두면 다른 테스트의 사용자 삭제를 FK가 막음. → FK를 **`on delete cascade`**로(사용자 삭제 시 동의/신청 정리 — 향후 계정삭제에도 정합). ⚠️ **@Transactional 안 붙은 E2E 테스트는 서로의 커밋 데이터를 본다.**
+
+### 4) 도메인/응답 분리 결정
+- **MyProfileResponse**(본인 `/me`, birthDate·bio·avatar 포함) vs **UserResponse**(관리자, birthDate 비노출). 같은 사용자라도 보는 주체에 따라 DTO 분리.
+- 아바타: `avatar_key`(스토리지 key) 저장 + `urlFor`로 URL 동적계산(EpisodeImage 패턴), 교체 시 이전 key `ObjectStorage.delete`.
+- 동의: **현재상태 스냅샷**(UNIQUE user+type, version·agreed_at). 필수(약관·개인정보)는 가입 차단 + 철회 불가, 마케팅 기본 opt-out(법적 정답). `userId`는 비-연관 Long.
+- 작가 전환: 현행 "관리자 수동 role 부여" → **신청·심사**(독자 신청→관리자 승인 시 role CREATOR). 중복·이미작가 차단.
+
+### 5) 미룬 것(외부/프로덕션) — `docs/roadmap-and-monetization.md`
+- OAuth(Google/Kakao/Apple), 이메일 인증·비번 재설정·이메일 변경(SMTP/SES), rate limiting·로그인 잠금·JWT 무효화/로그아웃, 계정 삭제(잊혀질권리). 스키마/플로우는 설계 단계에 대비.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
