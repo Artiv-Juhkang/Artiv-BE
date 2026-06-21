@@ -969,6 +969,28 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 22 — 커뮤니티 + 신고 + 자동 블라인드 ✅ 완료 (커밋: `feat: STEP 22 ...`)
+
+> 두 도메인을 한 STEP에(신고 대상이 곧 게시글/댓글이라 같이 봐야 함). 외부 0. 132개 테스트. 가장 큰 슬라이스.
+
+### 1) 폴리모픽 신고 + 신고↔커뮤니티 연결
+- `reports(target_type, target_id)`로 **게시글·댓글·유저·작품·회차 무엇이든 신고**(알림 설계의 폴리모픽 패턴 재사용). 한 신고자가 한 대상을 1회만(UNIQUE).
+- **자동 블라인드**: `ReportService.create` 후 해당 대상의 PENDING 신고 수를 집계, **≥5면 Post/PostComment를 blind()**(더티체킹). → report 도메인이 community 도메인에 **단방향 의존**(community는 report를 모름 → 순환 없음). "신고 ↔ 콘텐츠 연결"이 이 자동 블라인드.
+
+### 2) 1-depth 대댓글 평탄화
+- 댓글 작성 시 `parentId`가 **이미 대댓글이면(parent.isReply()) 그 최상위 부모로 평탄화** → 무한 중첩 방지(네이버식 1-depth). 조회는 top(parentId null) + parentId로 그룹핑해 replies 동봉.
+
+### 3) 비-연관 Long + 닉네임 배치 로드
+- Post/PostComment의 작성자는 비-연관 `Long authorId`. 목록 DTO의 닉네임은 **`userRepository.findAllById(distinct ids)` → Map**으로 한 번에 로드(N+1 회피). 단건은 findById.
+
+### 4) 자잘한 결정
+- 멀티파트 빈 요청: 이미지 없는 글도 `multipart()`로 보내야 `@RequestPart(required=false) images`가 바인딩(JSON POST면 "not a multipart request" 에러). [[apptoon-redesign-roadmap]]의 inquiry와 동일.
+- 블라인드 글: 공개 목록(`findVisible` where blinded=false)·상세(blinded면 404)에서 숨김. 관리자만 `/api/admin/posts`로 전체.
+- 추천수는 **denorm 카운터**(post.like_count) — lost update 가능, 정확히는 원자적 `update ... set like_count=like_count+1`. 학습 단계라 수용([[apptoon-redesign-roadmap]] 조회수와 동일 트레이드오프).
+- 삭제 cascade: 글 삭제 시 이미지 파일은 `imageStorageService.delete`, DB의 이미지/추천/댓글 행은 **FK on delete cascade**.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
