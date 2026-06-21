@@ -38,6 +38,12 @@ public class PostComment extends BaseEntity {
     @Column(nullable = false)
     private boolean blinded;
 
+    @Column(name = "blinded_by")
+    private Long blindedBy;
+
+    @Column(name = "blinded_at")
+    private java.time.Instant blindedAt;
+
     private PostComment(Long postId, Long authorId, Long parentId, String content) {
         this.postId = postId;
         this.authorId = authorId;
@@ -57,7 +63,9 @@ public class PostComment extends BaseEntity {
         return parentId != null;
     }
 
-    public void blind() {
+    public void blind(Long byUserId) {
         this.blinded = true;
+        this.blindedBy = byUserId;
+        this.blindedAt = java.time.Instant.now();
     }
 }

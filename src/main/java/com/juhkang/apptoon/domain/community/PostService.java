@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.juhkang.apptoon.domain.community.dto.PostAdminDetailResponse;
 import com.juhkang.apptoon.domain.community.dto.PostAdminResponse;
 import com.juhkang.apptoon.domain.community.dto.PostDetailResponse;
 import com.juhkang.apptoon.domain.community.dto.PostImageResponse;
@@ -113,18 +114,30 @@ public class PostService {
     }
 
     // ---- 관리자 ----
-    public PageResponse<PostAdminResponse> getForAdmin(Pageable pageable) {
-        Page<Post> page = postRepository.findAllByOrderByIdDesc(pageable);
+    public PageResponse<PostAdminResponse> getForAdmin(PostCategory category, String keyword, Boolean blinded, Pageable pageable) {
+        String kw = (keyword != null && !keyword.isBlank()) ? keyword.strip() : null;
+        Page<Post> page = postRepository.findForAdmin(category, kw, blinded, pageable);
         Map<Long, String> names = nicknames(page.getContent());
         return PageResponse.from(page.map(p -> new PostAdminResponse(p.getId(), p.getCategory(), p.getTitle(),
                 names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.isBlinded(), p.getCreatedAt())));
     }
 
+    public PostAdminDetailResponse getAdminDetail(Long id) {
+        Post post = load(id);
+        List<PostImageResponse> images = postImageRepository.findByPostIdOrderBySortOrderAsc(id).stream()
+                .map(im -> new PostImageResponse(imageStorageService.urlFor(im.getPath()),
+                        im.getWidth(), im.getHeight(), im.getSortOrder()))
+                .toList();
+        return new PostAdminDetailResponse(post.getId(), post.getCategory(), post.getTitle(), post.getContent(),
+                nickname(post.getAuthorId()), post.getLikeCount(), post.isBlinded(), post.getBlindedAt(),
+                images, post.getCreatedAt());
+    }
+
     @Transactional
-    public void setBlinded(Long id, boolean blinded) {
+    public void setBlinded(Long adminId, Long id, boolean blinded) {
         Post post = load(id);
         if (blinded) {
-            post.blind();
+            post.blind(adminId);
         } else {
             post.unblind();
         }

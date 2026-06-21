@@ -7,16 +7,19 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.juhkang.apptoon.domain.report.dto.ReportAdminDetailResponse;
 import com.juhkang.apptoon.domain.report.dto.ReportAdminResponse;
+import com.juhkang.apptoon.domain.report.dto.ReportResolveRequest;
 import com.juhkang.apptoon.global.dto.PageResponse;
 
 import lombok.RequiredArgsConstructor;
 
-/** 관리자 신고 관리 — 큐 조회·처리(resolve)·기각(dismiss). */
+/** 관리자 신고 관리 — 큐 조회(필터)·상세(대상 내용)·처리(액션 선택)·기각. */
 @RestController
 @RequestMapping("/api/admin/reports")
 @PreAuthorize("hasRole('ADMIN')")
@@ -27,17 +30,26 @@ public class AdminReportController {
 
     @GetMapping
     public PageResponse<ReportAdminResponse> list(@RequestParam(required = false) ReportStatus status,
+                                                  @RequestParam(required = false) ReportTargetType targetType,
+                                                  @RequestParam(required = false) ReportReason reason,
                                                   @PageableDefault(size = 30) Pageable pageable) {
-        return reportService.getForAdmin(status, pageable);
+        return reportService.getForAdmin(status, targetType, reason, pageable);
+    }
+
+    @GetMapping("/{reportId}")
+    public ReportAdminDetailResponse detail(@PathVariable Long reportId) {
+        return reportService.getDetail(reportId);
     }
 
     @PatchMapping("/{reportId}/resolve")
-    public ReportAdminResponse resolve(@AuthenticationPrincipal Long adminId, @PathVariable Long reportId) {
-        return reportService.resolve(adminId, reportId);
+    public ReportAdminDetailResponse resolve(@AuthenticationPrincipal Long adminId,
+                                             @PathVariable Long reportId,
+                                             @RequestBody(required = false) ReportResolveRequest request) {
+        return reportService.resolve(adminId, reportId, request != null ? request.action() : null);
     }
 
     @PatchMapping("/{reportId}/dismiss")
-    public ReportAdminResponse dismiss(@AuthenticationPrincipal Long adminId, @PathVariable Long reportId) {
+    public ReportAdminDetailResponse dismiss(@AuthenticationPrincipal Long adminId, @PathVariable Long reportId) {
         return reportService.dismiss(adminId, reportId);
     }
 }

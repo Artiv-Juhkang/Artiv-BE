@@ -976,20 +976,27 @@
   // 관리자 — 신고 관리
   // ====================================================================
   let adminReportStatus = 'PENDING';
+  let adminReportType = '';
+  let adminReportReason = '';
   function viewAdminReports() {
     const chips = [['', '전체'], ['PENDING', '접수'], ['RESOLVED', '처리'], ['DISMISSED', '기각']];
     setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>신고 관리</h1>
-      <p>접수된 신고를 검토하고 처리/기각하세요 (게시글·댓글은 신고 5건 시 자동 블라인드)</p></div></div>
-      <div class="filters" id="rp-filter">${chips.map(([v, l]) =>
-        `<button class="chip" data-v="${v}" ${v === adminReportStatus ? 'aria-current="true"' : ''}>${l}</button>`).join('')}</div>
+      <p>신고를 눌러 대상 내용을 확인하고 처리하세요 (게시글·댓글은 신고 5건 시 자동 블라인드)</p></div></div>
+      <div class="filters" id="rp-filter">
+        ${chips.map(([v, l]) => `<button class="chip" data-v="${v}" ${v === adminReportStatus ? 'aria-current="true"' : ''}>${l}</button>`).join('')}
+        <select id="rp-type"><option value="">전체 대상</option>${Object.entries(RTYPE).map(([k, v]) => `<option value="${k}" ${k === adminReportType ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select id="rp-reason"><option value="">전체 사유</option>${Object.entries(RREASON).map(([k, v]) => `<option value="${k}" ${k === adminReportReason ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      </div>
       <div id="rp-list">${loading}</div>`);
     $('#rp-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { adminReportStatus = b.dataset.v; viewAdminReports(); } });
+    $('#rp-type').addEventListener('change', (e) => { adminReportType = e.target.value; loadReports(); });
+    $('#rp-reason').addEventListener('change', (e) => { adminReportReason = e.target.value; loadReports(); });
     loadReports();
   }
   async function loadReports() {
     const list = $('#rp-list'); if (list) list.innerHTML = loading;
     try {
-      const q = `size=50${adminReportStatus ? `&status=${adminReportStatus}` : ''}`;
+      const q = `size=50${adminReportStatus ? `&status=${adminReportStatus}` : ''}${adminReportType ? `&targetType=${adminReportType}` : ''}${adminReportReason ? `&reason=${adminReportReason}` : ''}`;
       const page = await api('GET', `/api/admin/reports?${q}`);
       $('#rp-list').innerHTML = page.content.length
         ? `<div class="rows">${page.content.map(reportRow).join('')}</div>`
@@ -1000,59 +1007,107 @@
   function rStatusTag(s) { const cls = s === 'RESOLVED' ? 'tag--on' : (s === 'DISMISSED' ? 'tag--off' : ''); return `<span class="tag ${cls}">${RSTATUS[s] || s}</span>`; }
   function reportRow(r) {
     const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ko-KR') : '';
-    const actions = r.status === 'PENDING'
-      ? `<button class="btn btn--sm" data-act="resolve" data-id="${r.id}">처리</button>
-         <button class="btn btn--ghost btn--sm" data-act="dismiss" data-id="${r.id}">기각</button>`
-      : '';
-    return `<div class="row"><span class="row__no mono">#${r.id}</span>
+    return `<div class="row" data-id="${r.id}"><span class="row__no mono">#${r.id}</span>
       <div class="row__main"><div class="t">${RTYPE[r.targetType] || r.targetType} #${r.targetId} · ${RREASON[r.reason] || r.reason}</div>
         <div class="s">신고자 ${esc(r.reporterNickname)}${r.detail ? ' · ' + esc(r.detail) : ''} · ${when}</div></div>
-      <div class="row__side">${rStatusTag(r.status)}${actions}</div></div>`;
+      <div class="row__side">${rStatusTag(r.status)}<button class="btn btn--sm" data-act="open">상세</button></div></div>`;
   }
-  async function onReportClick(e) {
-    const btn = e.target.closest('[data-act]'); if (!btn) return;
-    try { await api('PATCH', `/api/admin/reports/${btn.dataset.id}/${btn.dataset.act}`, { json: {} });
-      toast(btn.dataset.act === 'resolve' ? '처리했어요' : '기각했어요', 'ok'); loadReports(); }
-    catch (err) { toast(errMsg(err), 'err'); }
+  function onReportClick(e) { const row = e.target.closest('.row'); if (row && e.target.closest('[data-act="open"]')) openReport(Number(row.dataset.id)); }
+  async function openReport(id) {
+    const m = document.createElement('div'); m.className = 'modal-bg'; m.innerHTML = `<div class="modal panel">${loading}</div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    try {
+      const r = await api('GET', `/api/admin/reports/${id}`);
+      const canAct = r.targetType === 'POST' || r.targetType === 'COMMENT';
+      m.querySelector('.modal').innerHTML = `
+        <h2>신고 상세</h2>
+        <p class="sub">${RTYPE[r.targetType] || r.targetType} #${r.targetId} · ${RREASON[r.reason] || r.reason} · ${rStatusTag(r.status)}</p>
+        <div class="set-sec"><h3>신고 대상 — ${esc(r.targetAuthorNickname || '-')}</h3><div class="iq-body">${esc(r.targetContent)}</div></div>
+        ${r.detail ? `<div class="set-sec"><h3>신고 사유 상세</h3><div class="iq-body">${esc(r.detail)}</div></div>` : ''}
+        <p class="hint">신고자 ${esc(r.reporterNickname)} · 같은 대상 신고 ${r.relatedReportCount}건</p>
+        <hr class="divider">
+        <div class="modal__actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <button class="btn btn--ghost btn--sm" data-dismiss>기각</button>
+          <span style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn--sm" data-resolve="NONE">처리(유지)</button>
+            ${canAct ? `<button class="btn btn--sm" data-resolve="BLIND_TARGET">블라인드</button>
+              <button class="btn btn--accent btn--sm" data-resolve="DELETE_TARGET">대상 삭제</button>` : ''}
+          </span></div>`;
+      const act = async (fn, msg) => { try { await fn(); toast(msg, 'ok'); m.remove(); loadReports(); } catch (err) { toast(errMsg(err), 'err'); } };
+      m.querySelectorAll('[data-resolve]').forEach((b) => b.addEventListener('click', () =>
+        act(() => api('PATCH', `/api/admin/reports/${id}/resolve`, { json: { action: b.dataset.resolve } }), '처리했어요')));
+      m.querySelector('[data-dismiss]').addEventListener('click', () =>
+        act(() => api('PATCH', `/api/admin/reports/${id}/dismiss`, { json: {} }), '기각했어요'));
+    } catch (e) { m.querySelector('.modal').innerHTML = errBox(e) + '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>'; }
   }
 
   // ====================================================================
   // 관리자 — 커뮤니티 관리
   // ====================================================================
+  let adminPostKw = '';
+  let adminPostCategory = '';
+  let adminPostBlinded = '';
   function viewAdminCommunity() {
     setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>커뮤니티 관리</h1>
-      <p>블라인드 포함 전체 게시글. 가리거나 삭제하세요</p></div></div>
+      <p>블라인드 포함 전체 게시글. 검색·필터 후 글을 눌러 확인하세요</p></div></div>
+      <form class="filters" id="pc-filter">
+        <input class="search-input" id="pc-kw" placeholder="제목 검색" autocomplete="off" value="${esc(adminPostKw)}">
+        <select id="pc-cat"><option value="">전체 종류</option>${Object.entries(PCAT).map(([k, v]) => `<option value="${k}" ${k === adminPostCategory ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select id="pc-blind"><option value="">전체</option><option value="false" ${adminPostBlinded === 'false' ? 'selected' : ''}>공개</option><option value="true" ${adminPostBlinded === 'true' ? 'selected' : ''}>블라인드</option></select>
+        <button class="btn btn--sm" type="submit">검색</button>
+      </form>
       <div id="pc-list">${loading}</div>`);
+    $('#pc-filter').addEventListener('submit', (e) => { e.preventDefault(); adminPostKw = $('#pc-kw').value.trim(); adminPostCategory = $('#pc-cat').value; adminPostBlinded = $('#pc-blind').value; loadAdminPosts(); });
     loadAdminPosts();
   }
   async function loadAdminPosts() {
     const list = $('#pc-list'); if (list) list.innerHTML = loading;
     try {
-      const page = await api('GET', '/api/admin/posts?size=50');
+      const q = `size=50${adminPostKw ? `&keyword=${encodeURIComponent(adminPostKw)}` : ''}${adminPostCategory ? `&category=${adminPostCategory}` : ''}${adminPostBlinded ? `&blinded=${adminPostBlinded}` : ''}`;
+      const page = await api('GET', `/api/admin/posts?${q}`);
       $('#pc-list').innerHTML = page.content.length
         ? `<div class="rows">${page.content.map(adminPostRow).join('')}</div>`
-        : emptyBox('게시글이 없어요', '아직 작성된 글이 없어요.');
+        : emptyBox('게시글이 없어요', '검색 조건을 바꿔보세요.');
       $('#pc-list').addEventListener('click', onAdminPostClick);
     } catch (e) { $('#pc-list').innerHTML = errBox(e); }
   }
   function adminPostRow(p) {
     const when = p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR') : '';
-    return `<div class="row" ${p.blinded ? 'style="opacity:.6"' : ''}><span class="row__no mono">#${p.id}</span>
+    return `<div class="row" data-id="${p.id}" ${p.blinded ? 'style="opacity:.6"' : ''}><span class="row__no mono">#${p.id}</span>
       <div class="row__main"><div class="t">${esc(p.title)} ${p.blinded ? '<span class="tag tag--19">블라인드</span>' : ''}</div>
         <div class="s">${PCAT[p.category] || p.category} · ${esc(p.authorNickname)} · ♡${p.likeCount} · ${when}</div></div>
       <div class="row__side">
-        ${p.blinded ? `<button class="btn btn--sm" data-act="unblind" data-id="${p.id}">해제</button>`
-          : `<button class="btn btn--ghost btn--sm" data-act="blind" data-id="${p.id}">블라인드</button>`}
-        <button class="btn btn--ghost btn--sm" data-act="delete" data-id="${p.id}">삭제</button></div></div>`;
+        <button class="btn btn--sm" data-act="open">상세</button>
+        ${p.blinded ? `<button class="btn btn--ghost btn--sm" data-act="unblind">해제</button>`
+          : `<button class="btn btn--ghost btn--sm" data-act="blind">블라인드</button>`}
+        <button class="btn btn--ghost btn--sm" data-act="delete">삭제</button></div></div>`;
   }
   async function onAdminPostClick(e) {
     const btn = e.target.closest('[data-act]'); if (!btn) return;
-    const id = btn.dataset.id, act = btn.dataset.act;
+    const row = e.target.closest('.row'); const id = row.dataset.id, act = btn.dataset.act;
+    if (act === 'open') return openAdminPost(Number(id));
     try {
       if (act === 'delete') { await api('DELETE', `/api/posts/${id}`); toast('삭제했어요', 'ok'); }
       else { await api('PATCH', `/api/admin/posts/${id}/${act}`); toast(act === 'blind' ? '블라인드했어요' : '해제했어요', 'ok'); }
       loadAdminPosts();
     } catch (err) { toast(errMsg(err), 'err'); }
+  }
+  async function openAdminPost(id) {
+    const m = document.createElement('div'); m.className = 'modal-bg'; m.innerHTML = `<div class="modal panel">${loading}</div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    try {
+      const p = await api('GET', `/api/admin/posts/${id}`);
+      m.querySelector('.modal').innerHTML = `
+        <h2>${esc(p.title)}</h2>
+        <div class="card__meta" style="margin-bottom:14px"><span class="tag">${PCAT[p.category] || p.category}</span>
+          <span class="tag">♡ ${p.likeCount}</span>${p.blinded ? '<span class="tag tag--19">블라인드</span>' : ''}</div>
+        <p class="sub">${esc(p.authorNickname)}</p>
+        <div class="iq-body">${esc(p.content)}</div>
+        ${imageGallery(p.images)}
+        <div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>`;
+    } catch (e) { m.querySelector('.modal').innerHTML = errBox(e) + '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>'; }
   }
 
   // ---- helpers ----

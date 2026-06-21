@@ -44,6 +44,12 @@ public class Post extends BaseEntity {
     @Column(nullable = false)
     private boolean blinded;
 
+    @Column(name = "blinded_by")
+    private Long blindedBy;
+
+    @Column(name = "blinded_at")
+    private java.time.Instant blindedAt;
+
     private Post(Long authorId, PostCategory category, String title, String content) {
         this.authorId = authorId;
         this.category = category;
@@ -69,11 +75,16 @@ public class Post extends BaseEntity {
         }
     }
 
-    public void blind() {
+    /** byUserId=null이면 시스템 자동 블라인드(신고 임계치), 값이 있으면 관리자 수동. */
+    public void blind(Long byUserId) {
         this.blinded = true;
+        this.blindedBy = byUserId;
+        this.blindedAt = java.time.Instant.now();
     }
 
     public void unblind() {
         this.blinded = false;
+        this.blindedBy = null;
+        this.blindedAt = null;
     }
 }

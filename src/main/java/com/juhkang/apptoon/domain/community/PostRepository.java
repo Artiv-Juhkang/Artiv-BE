@@ -13,6 +13,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             countQuery = "select count(p) from Post p where p.blinded = false and (:category is null or p.category = :category)")
     Page<Post> findVisible(@Param("category") PostCategory category, Pageable pageable);
 
-    /** 관리자: 블라인드 포함 전체. */
-    Page<Post> findAllByOrderByIdDesc(Pageable pageable);
+    /** 관리자: 블라인드 포함 전체 + 카테고리·제목키워드·블라인드상태 필터. */
+    @Query(value = "select p from Post p where (:category is null or p.category = :category) "
+            + "and (:keyword is null or lower(p.title) like lower(concat('%', cast(:keyword as string), '%'))) "
+            + "and (:blinded is null or p.blinded = :blinded) order by p.id desc",
+            countQuery = "select count(p) from Post p where (:category is null or p.category = :category) "
+                    + "and (:keyword is null or lower(p.title) like lower(concat('%', cast(:keyword as string), '%'))) "
+                    + "and (:blinded is null or p.blinded = :blinded)")
+    Page<Post> findForAdmin(@Param("category") PostCategory category, @Param("keyword") String keyword,
+                            @Param("blinded") Boolean blinded, Pageable pageable);
 }

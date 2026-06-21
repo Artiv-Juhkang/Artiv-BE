@@ -8,7 +8,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.apptoon.domain.community.Post;
 import com.juhkang.apptoon.domain.community.PostComment;
 import com.juhkang.apptoon.domain.community.PostCommentRepository;
+import com.juhkang.apptoon.domain.community.PostCommentService;
 import com.juhkang.apptoon.domain.community.PostRepository;
+import com.juhkang.apptoon.domain.community.PostService;
+import com.juhkang.apptoon.domain.report.dto.ReportAdminDetailResponse;
 import com.juhkang.apptoon.domain.report.dto.ReportAdminResponse;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
@@ -29,6 +32,8 @@ public class ReportService {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostService postService;
+    private final PostCommentService postCommentService;
 
     @Transactional
     public void create(Long reporterId, ReportTargetType targetType, Long targetId, ReportReason reason, String detail) {
@@ -39,7 +44,7 @@ public class ReportService {
         autoBlind(targetType, targetId);
     }
 
-    /** 한 대상에 접수(PENDING) 신고가 임계치 이상이면 자동 블라인드. */
+    /** 접수 신고 임계치 이상이면 시스템 자동 블라인드(blinded_by=null). */
     private void autoBlind(ReportTargetType targetType, Long targetId) {
         if (targetType != ReportTargetType.POST && targetType != ReportTargetType.COMMENT) {
             return;
@@ -49,31 +54,76 @@ public class ReportService {
             return;
         }
         if (targetType == ReportTargetType.POST) {
-            postRepository.findById(targetId).ifPresent(Post::blind);
+            postRepository.findById(targetId).ifPresent(p -> p.blind(null));
         } else {
-            postCommentRepository.findById(targetId).ifPresent(PostComment::blind);
+            postCommentRepository.findById(targetId).ifPresent(c -> c.blind(null));
         }
     }
 
-    public PageResponse<ReportAdminResponse> getForAdmin(ReportStatus status, Pageable pageable) {
-        Page<Report> page = (status == null)
-                ? reportRepository.findAllByOrderByIdDesc(pageable)
-                : reportRepository.findByStatus(status, pageable);
+    public PageResponse<ReportAdminResponse> getForAdmin(ReportStatus status, ReportTargetType targetType,
+                                                         ReportReason reason, Pageable pageable) {
+        Page<Report> page = reportRepository.findForAdmin(status, targetType, reason, pageable);
         return PageResponse.from(page.map(r -> ReportAdminResponse.of(r, nickname(r.getReporterId()))));
     }
 
-    @Transactional
-    public ReportAdminResponse resolve(Long adminId, Long reportId) {
-        Report report = load(reportId);
-        report.resolve(adminId);
-        return ReportAdminResponse.of(report, nickname(report.getReporterId()));
+    public ReportAdminDetailResponse getDetail(Long reportId) {
+        return detailOf(load(reportId));
     }
 
     @Transactional
-    public ReportAdminResponse dismiss(Long adminId, Long reportId) {
+    public ReportAdminDetailResponse resolve(Long adminId, Long reportId, ReportResolveAction action) {
+        Report report = load(reportId);
+        report.resolve(adminId);
+        applyAction(adminId, report, action);
+        return detailOf(report);
+    }
+
+    @Transactional
+    public ReportAdminDetailResponse dismiss(Long adminId, Long reportId) {
         Report report = load(reportId);
         report.dismiss(adminId);
-        return ReportAdminResponse.of(report, nickname(report.getReporterId()));
+        return detailOf(report);
+    }
+
+    /** 처리 시 대상에 조치(블라인드/삭제). 게시글·댓글만 대상. */
+    private void applyAction(Long adminId, Report report, ReportResolveAction action) {
+        if (action == null || action == ReportResolveAction.NONE) {
+            return;
+        }
+        if (report.getTargetType() == ReportTargetType.POST) {
+            if (action == ReportResolveAction.BLIND_TARGET) {
+                postRepository.findById(report.getTargetId()).ifPresent(p -> p.blind(adminId));
+            } else if (action == ReportResolveAction.DELETE_TARGET) {
+                postService.delete(adminId, true, report.getTargetId());
+            }
+        } else if (report.getTargetType() == ReportTargetType.COMMENT) {
+            if (action == ReportResolveAction.BLIND_TARGET) {
+                postCommentRepository.findById(report.getTargetId()).ifPresent(c -> c.blind(adminId));
+            } else if (action == ReportResolveAction.DELETE_TARGET) {
+                postCommentService.delete(adminId, true, report.getTargetId());
+            }
+        }
+    }
+
+    private ReportAdminDetailResponse detailOf(Report report) {
+        String content = "";
+        String author = "";
+        switch (report.getTargetType()) {
+            case POST -> {
+                Post p = postRepository.findById(report.getTargetId()).orElse(null);
+                if (p != null) { content = p.getContent(); author = nickname(p.getAuthorId()); }
+                else { content = "(삭제된 게시글)"; }
+            }
+            case COMMENT -> {
+                PostComment c = postCommentRepository.findById(report.getTargetId()).orElse(null);
+                if (c != null) { content = c.getContent(); author = nickname(c.getAuthorId()); }
+                else { content = "(삭제된 댓글)"; }
+            }
+            case USER -> { author = nickname(report.getTargetId()); content = "(사용자 신고)"; }
+            default -> content = "(" + report.getTargetType() + " 신고)";
+        }
+        long related = reportRepository.countByTargetTypeAndTargetId(report.getTargetType(), report.getTargetId());
+        return ReportAdminDetailResponse.of(report, nickname(report.getReporterId()), content, author, related);
     }
 
     private Report load(Long id) {
