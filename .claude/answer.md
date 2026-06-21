@@ -903,6 +903,29 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 19 — 작품 장르·태그 ✅ 완료 (커밋: `feat: STEP 19 작품 장르·태그 ...`)
+
+> 탐색·추천·랭킹의 받침대. **외부 설정 0**(첫 "build now" 받침대). 단일 주(主)장르(enum) + 자유 태그(다대다 값). 101개 테스트 GREEN.
+
+### 1) 태그는 ManyToMany 대신 `@ElementCollection Set<String>`
+- `publishDays`가 이미 ElementCollection(series_publish_days)인 전례를 복제 → 태그도 `series_tags(series_id, tag)` 값 컬렉션. **ManyToMany 함정(고아·cascade·조인중복) 회피**, 별도 Tag 엔티티/마스터 불필요(YAGNI). 필터는 `:tag member of s.tags`(요일 필터와 동일 패턴).
+- OSIV off라 DTO 매핑 시 LAZY 컬렉션은 **`Set.copyOf(series.getTags())`로 트랜잭션 안에서 복사**(publishDays와 동일). [[apptoon-lazy-serialization-gotcha]]
+
+### 2) 깨지지 않는 스키마 진화 (정밀 수정)
+- `series`에 `genre varchar(20) not null default 'ETC'` → **기존 작품 행은 ETC로 자동 채움**(not null 유지).
+- `Series.create(...)` 팩토리는 **무변경** — genre/tags는 필드 기본값(ETC/빈Set)으로 두고, 서비스가 생성 후 `changeGenre()`/`replaceTags()`로 설정. → 기존 `create()` 호출부(테스트 다수) 0 변경. (adultOnly 추가 때와 같은 전략.)
+- `SeriesCreateRequest.genre/tags`는 **선택(nullable)** → 기존 API 클라이언트/테스트가 안 깨짐. genre null이면 서비스에서 ETC.
+
+### 3) 검색 필터 통합 & 정규화
+- 기존 `search` JPQL에 `(:genre is null or s.genre = :genre)` + `(:tag is null or :tag member of s.tags)` 추가(value/countQuery 양쪽). enum/문자열 null 파라미터 정상 동작.
+- 태그 정규화는 서비스에서: 공백제거(strip)·빈값/30자초과 제외·중복제거(Set)·최대 10개(limit).
+- 수정: `PATCH /api/series/{id}/genre-tags`(본인만 — `@PreAuthorize(CREATOR)` + `isAuthoredBy` 서비스 검증, 남이면 403).
+
+### 4) 다음
+- 받침대 중 **알림 센터(인앱)**는 설계 완료([`docs/design-notification.md`](design-notification.md)) — genre·tag가 V14를 가져가서 **알림은 V15**가 됨(구현 시 부여). 외부 설정 불필요 목록은 [`docs/roadmap-and-monetization.md`].
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)

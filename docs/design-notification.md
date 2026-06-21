@@ -34,7 +34,8 @@
 - **`read_at timestamptz` (null=미읽음)**: 단일 컬럼이 읽음여부+읽은시각 동시 표현(`read`는 예약어 회피).
 - **`dedup_key` + 부분 유니크**: 멱등(예약발행 스케줄러 재실행 시 구독자당 회차 1건 보장). 중복 허용 이벤트(댓글 등)는 null.
 
-### 3.2 마이그레이션 — `V14__create_notifications.sql`
+### 3.2 마이그레이션 — `V15__create_notifications.sql`
+> (V14는 장르·태그가 사용 → 알림은 V15. 구현 시점의 다음 가용 버전을 부여.)
 ```sql
 -- 알림(인앱). 제네릭 이벤트 로그: 폴리모픽 타겟 + 비정규화 렌더필드.
 create table notifications (
