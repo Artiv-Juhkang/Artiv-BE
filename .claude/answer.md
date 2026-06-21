@@ -991,6 +991,27 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 23 — 신고/커뮤니티 모더레이션 상세·처리·검색 (활동/알림 단계 설계) ✅ 완료 (커밋: `feat: STEP 23 ...`)
+
+> 멀티에이전트로 "모더레이션 상세 + 활동내역/서재 + 작가소식피드 + 인앱 알림저장소"를 9단계로 설계 → **즉시 필요한 2슬라이스(신고 상세·처리·필터 / 커뮤니티 상세·검색)만 구현**, 나머지(알림저장소→멘션→서재→피드)는 [`docs/design-moderation-activity.md`]로 박제. 137개 테스트. 과대 슬라이스 회피.
+
+### 1) 신고 상세 — 폴리모픽 대상 내용 조회
+- 관리자가 신고 클릭 → **대상 게시글/댓글 실제 내용** 표시. `ReportService.detailOf`가 `targetType` switch로 Post/PostComment/User 분기 조회(content·author). 관련 신고 수는 `countByTargetTypeAndTargetId`로 역집계. → 폴리모픽 신고 대상의 내용을 보여주는 표준 패턴.
+
+### 2) 신고 처리 = 액션 선택 (report → community 단방향 위임)
+- `PATCH /resolve {action: NONE|BLIND_TARGET|DELETE_TARGET}`. 대상이 게시글/댓글일 때만 조치. **삭제는 `PostService.delete`/`PostCommentService.delete`로 위임**(이미지 정리·cascade 재사용) → ReportService가 community 서비스에 **단방향 의존**(순환 없음). 블라인드는 엔티티 직접 `blind(adminId)`.
+
+### 3) 블라인드 이력 — 한 메서드로 자동/수동 구분
+- `Post/PostComment.blind(Long byUserId)`: **자동 블라인드(신고 임계치)는 `byUserId=null`(시스템)**, 관리자 수동은 adminId. V19에 `blinded_by`·`blinded_at` 추가. 메서드참조(`Post::blind`)가 인자 추가로 깨져 람다(`p -> p.blind(null)`)로 교체 — 시그니처 변경 시 호출부(메서드참조 포함) 확인.
+
+### 4) 커뮤니티 관리 검색·필터
+- `PostRepository.findForAdmin(category, titleKeyword, blinded, pageable)` — 기존 series `search`의 `lower(title) like lower(concat('%', cast(:kw as string), '%'))` + null 파라미터 패턴 재사용. 관리자 상세는 블라인드 포함 전체 조회(공개 `findVisible`과 분리).
+
+### 5) 설계는 멀티에이전트, 구현은 슬라이스
+- 워크플로가 9단계·각 ~1주로 산정 → **한 턴에 다 하지 않고** 즉시 가치 높은 2개만 TDD 구현, 나머지는 단계 문서로. 비평이 잡은 "미구현"은 대부분 다음 단계의 할 일(=정상). **설계 범위 ≠ 구현 범위.**
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
