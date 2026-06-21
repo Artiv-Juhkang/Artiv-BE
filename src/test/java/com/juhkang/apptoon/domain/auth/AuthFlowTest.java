@@ -41,7 +41,7 @@ class AuthFlowTest {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"nickname\":\"" + nickname
-                                + "\",\"birthDate\":\"2000-01-01\"}"))
+                                + "\",\"birthDate\":\"2000-01-01\",\"consents\":{\"TERMS_OF_SERVICE\":true,\"PRIVACY_POLICY\":true}}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists());
     }

@@ -2,6 +2,7 @@ package com.juhkang.apptoon.domain.auth;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Base64;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +13,7 @@ import com.juhkang.apptoon.domain.auth.dto.LoginRequest;
 import com.juhkang.apptoon.domain.auth.dto.RefreshRequest;
 import com.juhkang.apptoon.domain.auth.dto.SignupRequest;
 import com.juhkang.apptoon.domain.auth.dto.TokenResponse;
+import com.juhkang.apptoon.domain.user.ConsentService;
 import com.juhkang.apptoon.domain.user.Role;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
@@ -26,14 +28,20 @@ public class AuthService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    private static final int MIN_SIGNUP_AGE = 14; // 만 14세 미만 가입 차단(개인정보보호법)
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final JwtProperties jwtProperties;
+    private final ConsentService consentService;
 
     @Transactional
     public Long signup(SignupRequest request) {
+        if (request.birthDate().isAfter(LocalDate.now().minusYears(MIN_SIGNUP_AGE))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT); // 만 14세 미만
+        }
         if (userRepository.existsByEmail(request.email())) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
         }
@@ -44,7 +52,9 @@ public class AuthService {
                 Role.READER,
                 request.birthDate()
         );
-        return userRepository.save(user).getId();
+        Long userId = userRepository.save(user).getId();
+        consentService.captureSignup(userId, request.consents()); // 필수 동의 검증 + 기록
+        return userId;
     }
 
     @Transactional

@@ -8,6 +8,8 @@
   const DAYS = [['MONDAY','월'],['TUESDAY','화'],['WEDNESDAY','수'],['THURSDAY','목'],['FRIDAY','금'],['SATURDAY','토'],['SUNDAY','일']];
   const ITYPE = { ACCOUNT: '계정', PAYMENT: '결제', CONTENT: '콘텐츠·신고', CREATOR: '작가·작품', BUG: '오류', ETC: '기타' };
   const ISTATUS = { PENDING: '대기', ANSWERED: '답변완료', CLOSED: '종료' };
+  const CONSENT_LABEL = { TERMS_OF_SERVICE: '서비스 이용약관', PRIVACY_POLICY: '개인정보 처리방침', MARKETING_EMAIL: '마케팅 수신', ADULT_CONTENT_19: '성인 콘텐츠 열람' };
+  const CREQ_STATUS = { PENDING: '대기', APPROVED: '승인', REJECTED: '거부' };
 
   const state = {
     token: localStorage.getItem('apptoon_token') || null,
@@ -156,7 +158,7 @@
   // ====================================================================
   function navItems() {
     if (state.user.role === 'ADMIN') {
-      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리']];
+      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리'], ['admin-creator-requests', '작가 신청']];
     }
     return [['dashboard', '내 작품'], ['create', '작품 등록'], ['inquiries', '문의']];
   }
@@ -198,15 +200,30 @@
       : `<span class="stamp">${u.role === 'CREATOR' ? 'CREATOR' : 'READER'}</span>`;
     const pref = themePref();
     const opts = [['system', '🖥️', '시스템'], ['light', '☀️', '라이트'], ['dark', '🌙', '다크']];
+    const avatar = u.avatarUrl
+      ? `<img class="set-avatar" src="${esc(u.avatarUrl)}" alt="">`
+      : `<div class="set-avatar set-avatar--empty">${esc((u.nickname || '?').slice(0, 1))}</div>`;
     const m = document.createElement('div'); m.className = 'modal-bg';
     m.innerHTML = `<div class="modal panel" role="dialog" aria-label="설정">
       <h2>설정</h2><p class="sub">계정과 화면을 관리하세요</p>
       <div class="set-sec"><h3>내 정보</h3>
-        <div class="set-me"><div class="nm">${esc(u.nickname)} ${roleStamp}</div>
-          <div class="ln">${esc(u.email)}</div><div class="ln">가입일 ${joined}</div></div></div>
+        <div class="set-me" style="flex-direction:row;align-items:center;gap:14px">${avatar}
+          <div><div class="nm">${esc(u.nickname)} ${roleStamp}</div>
+            <div class="ln">${esc(u.email)}</div><div class="ln">가입일 ${joined}</div></div></div></div>
+      <div class="set-sec"><h3>프로필 편집</h3>
+        <div class="field"><label for="pf-nick">닉네임</label><input id="pf-nick" maxlength="20" value="${esc(u.nickname)}"></div>
+        <div class="field"><label for="pf-bio">소개</label><textarea id="pf-bio" maxlength="500" placeholder="자기소개">${esc(u.bio || '')}</textarea></div>
+        <div class="field"><label>아바타 <span class="hint">(jpg/png)</span></label>
+          <label class="btn btn--sm" style="width:fit-content">이미지 선택<input id="pf-avatar" type="file" accept="image/png,image/jpeg" hidden></label></div>
+        <button class="btn btn--accent btn--sm" id="pf-save">프로필 저장</button></div>
+      <div class="set-sec"><h3>비밀번호 변경</h3>
+        <div class="field"><label for="pf-cur">현재 비밀번호</label><input id="pf-cur" type="password" autocomplete="current-password"></div>
+        <div class="field"><label for="pf-new">새 비밀번호</label><input id="pf-new" type="password" autocomplete="new-password" placeholder="8자 이상"></div>
+        <button class="btn btn--sm" id="pf-pw">비밀번호 변경</button></div>
       <div class="set-sec"><h3>테마</h3>
         <div class="seg" id="set-theme">${opts.map(([v, ic, l]) =>
           `<button data-theme-val="${v}" ${v === pref ? 'aria-current="true"' : ''}>${ic} ${l}</button>`).join('')}</div></div>
+      <div class="set-sec"><h3>동의 내역</h3><div id="set-consents">${loading}</div></div>
       <hr class="divider">
       <div class="modal__actions" style="justify-content:space-between">
         <button class="btn btn--ghost btn--sm" id="set-logout">로그아웃</button>
@@ -232,6 +249,49 @@
       }
       if (e.target.closest('#set-logout')) { close(); clearTokens(); renderLogin(); }
     });
+    $('#pf-save', m).addEventListener('click', async () => {
+      try {
+        const nick = $('#pf-nick', m).value.trim();
+        if (nick && nick !== state.user.nickname) state.user = await api('PATCH', '/api/users/me/nickname', { json: { nickname: nick } });
+        state.user = await api('PATCH', '/api/users/me/bio', { json: { bio: $('#pf-bio', m).value } });
+        toast('프로필을 저장했어요', 'ok');
+      } catch (err) { toast(errMsg(err), 'err'); }
+    });
+    $('#pf-avatar', m).addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      try { state.user = await api('POST', '/api/users/me/avatar', { form: fd }); toast('아바타를 변경했어요', 'ok'); close(); openSettings(); }
+      catch (err) { toast(errMsg(err), 'err'); }
+    });
+    $('#pf-pw', m).addEventListener('click', async () => {
+      const cur = $('#pf-cur', m).value, nw = $('#pf-new', m).value;
+      if (!cur || !nw) return toast('현재·새 비밀번호를 입력하세요', 'err');
+      try { await api('PATCH', '/api/users/me/password', { json: { currentPassword: cur, newPassword: nw } });
+        toast('비밀번호를 변경했어요', 'ok'); $('#pf-cur', m).value = ''; $('#pf-new', m).value = ''; }
+      catch (err) { toast('현재 비밀번호가 올바르지 않아요', 'err'); }
+    });
+    loadConsents(m);
+  }
+
+  async function loadConsents(m) {
+    const box = $('#set-consents', m); if (!box) return;
+    try {
+      const list = await api('GET', '/api/users/me/consents');
+      box.innerHTML = list.map((c) => {
+        const label = CONSENT_LABEL[c.consentType] || c.consentType;
+        const when = c.agreedAt ? new Date(c.agreedAt).toLocaleDateString('ko-KR') : '-';
+        const ctrl = c.consentType === 'MARKETING_EMAIL'
+          ? `<label class="check ${c.agreed ? 'check--on' : ''}"><input type="checkbox" data-consent="MARKETING_EMAIL" ${c.agreed ? 'checked' : ''}><span>${c.agreed ? '동의' : '미동의'}</span></label>`
+          : `<span class="tag ${c.agreed ? 'tag--on' : 'tag--off'}">${c.agreed ? '동의' : '미동의'}</span>`;
+        return `<div class="set-consent"><div><b>${label}</b>${c.required ? ' <span class="hint">(필수)</span>' : ''}<div class="ln">v${c.version} · ${when}</div></div>${ctrl}</div>`;
+      }).join('');
+      box.addEventListener('change', async (e) => {
+        const cb = e.target.closest('[data-consent]'); if (!cb) return;
+        try { await api('PATCH', '/api/users/me/consents', { json: { consents: { [cb.dataset.consent]: cb.checked } } });
+          toast('동의 설정을 변경했어요', 'ok'); loadConsents(m); }
+        catch (err) { toast(errMsg(err), 'err'); cb.checked = !cb.checked; }
+      });
+    } catch (e) { box.innerHTML = errBox(e); }
   }
 
   function setMain(html) { const m = $('#main'); if (m) m.innerHTML = html; }
@@ -249,6 +309,7 @@
     if (v === 'admin-series') return viewAdminSeries();
     if (v === 'admin-users') return viewAdminUsers();
     if (v === 'admin-inquiries') return viewAdminInquiries();
+    if (v === 'admin-creator-requests') return viewAdminCreatorRequests();
     if (v === 'inquiries') return viewMyInquiries();
   }
 
@@ -802,6 +863,79 @@
       });
     } catch (e) {
       m.querySelector('.modal').innerHTML = errBox(e) + '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>';
+    }
+  }
+
+  // ====================================================================
+  // 관리자 — 작가 신청 관리
+  // ====================================================================
+  let adminCreqStatus = '';
+  let creqCache = [];
+  function viewAdminCreatorRequests() {
+    const chips = [['', '전체'], ['PENDING', '대기'], ['APPROVED', '승인'], ['REJECTED', '거부']];
+    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>작가 신청</h1>
+      <p>독자의 작가 전환 신청을 검토하고 승인/거부하세요</p></div></div>
+      <div class="filters" id="cq-filter">${chips.map(([v, l]) =>
+        `<button class="chip" data-v="${v}" ${v === adminCreqStatus ? 'aria-current="true"' : ''}>${l}</button>`).join('')}</div>
+      <div id="cq-list">${loading}</div>`);
+    $('#cq-filter').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]'); if (b) { adminCreqStatus = b.dataset.v; viewAdminCreatorRequests(); }
+    });
+    loadCreatorRequests();
+  }
+  async function loadCreatorRequests() {
+    const list = $('#cq-list'); if (list) list.innerHTML = loading;
+    try {
+      const q = `size=50${adminCreqStatus ? `&status=${adminCreqStatus}` : ''}`;
+      const page = await api('GET', `/api/admin/creator-requests?${q}`);
+      creqCache = page.content;
+      $('#cq-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(creqRow).join('')}</div>`
+        : emptyBox('신청이 없어요', '조건을 바꿔보세요.');
+      $('#cq-list').addEventListener('click', onCreqClick);
+    } catch (e) { $('#cq-list').innerHTML = errBox(e); }
+  }
+  function creqStatusTag(s) {
+    const cls = s === 'APPROVED' ? 'tag--on' : (s === 'REJECTED' ? 'tag--off' : '');
+    return `<span class="tag ${cls}">${CREQ_STATUS[s] || s}</span>`;
+  }
+  function creqRow(r) {
+    const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ko-KR') : '';
+    return `<div class="row" data-id="${r.id}"><span class="row__no mono">#${r.id}</span>
+      <div class="row__main"><div class="t">${esc(r.applicantNickname)}</div><div class="s">${esc(r.applicantEmail)} · ${when}</div></div>
+      <div class="row__side">${creqStatusTag(r.status)}<button class="btn btn--sm" data-act="open">상세</button></div></div>`;
+  }
+  function onCreqClick(e) {
+    const row = e.target.closest('.row');
+    if (row && e.target.closest('[data-act="open"]')) openCreatorRequest(Number(row.dataset.id));
+  }
+  function openCreatorRequest(id) {
+    const r = creqCache.find((x) => x.id === id);
+    if (!r) return;
+    const pending = r.status === 'PENDING';
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel">
+      <h2>작가 전환 신청</h2>
+      <p class="sub">${esc(r.applicantNickname)} · ${esc(r.applicantEmail)} · ${creqStatusTag(r.status)}</p>
+      <div class="set-sec"><h3>신청 사유</h3><div class="iq-body">${esc(r.requestReason)}</div></div>
+      ${r.adminNote ? `<div class="set-sec"><h3>관리자 메모</h3><div class="iq-body">${esc(r.adminNote)}</div></div>` : ''}
+      ${pending ? `<hr class="divider">
+        <div class="field"><label for="cq-note">메모 (선택)</label><input id="cq-note" placeholder="승인/거부 사유"></div>
+        <div class="modal__actions">
+          <button class="btn btn--ghost btn--sm" data-reject>거부</button>
+          <button class="btn btn--accent btn--sm" data-approve>승인 (작가 전환)</button></div>`
+        : '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>'}</div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
+    if (pending) {
+      const act = async (path) => {
+        try {
+          await api('PATCH', `/api/admin/creator-requests/${id}/${path}`, { json: { adminNote: $('#cq-note', m).value || null } });
+          toast(path === 'approve' ? '승인했어요' : '거부했어요', 'ok'); m.remove(); loadCreatorRequests();
+        } catch (err) { toast(errMsg(err), 'err'); }
+      };
+      m.querySelector('[data-approve]').addEventListener('click', () => act('approve'));
+      m.querySelector('[data-reject]').addEventListener('click', () => act('reject'));
     }
   }
 

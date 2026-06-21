@@ -42,6 +42,12 @@ public class User extends BaseEntity {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Column(name = "avatar_key", length = 500)
+    private String avatarKey;
+
+    @Column(length = 500)
+    private String bio;
+
     private User(String email, String password, String nickname, Role role, LocalDate birthDate) {
         this.email = email;
         this.password = password;
@@ -61,5 +67,22 @@ public class User extends BaseEntity {
 
     public void changeRole(Role role) {
         this.role = role;
+    }
+
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void changeBio(String bio) {
+        this.bio = bio;
+    }
+
+    /** 아바타 저장 key 교체(삭제 시 null). 공개 URL은 스토리지에서 동적 계산. */
+    public void changeAvatar(String avatarKey) {
+        this.avatarKey = avatarKey;
+    }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
     }
 }
