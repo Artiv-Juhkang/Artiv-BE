@@ -27,7 +27,8 @@
 - **핵심**: `Notification(user, type, 대상ref, read, createdAt)` + fan-out 생성 + `GET /api/me/notifications`(페이징) + 읽음 `PATCH .../{id}/read` + 미읽음 개수(뱃지).
 - **재활용**: 신규회차 fan-out은 구독자(`SubscriptionRepository`), 발행 훅(`EpisodeService.upload`/`EpisodePublisher.publishDueEpisodes`).
 - **의존성**: 없음(독립). **이게 먼저면 팔로우 소식·커뮤니티 반응 알림이 공짜로 얹힘.**
-- **열린 결정**: 전달 방식(폴링/SSE/WebSocket/외부푸시), fan-out 동기 vs 비동기(`@TransactionalEventListener`). → **상세 표는 [`ToDoList.md`](../ToDoList.md)에 이미 정리됨**(폴링+비동기가 학습 균형점).
+- **열린 결정**: 전달 방식(폴링/SSE/WebSocket/외부푸시), fan-out 동기 vs 비동기(`@TransactionalEventListener`).
+- **📄 상세 설계(데이터 모델·이벤트·API)**: **[`docs/design-notification.md`](design-notification.md)** — V14 스키마·엔티티·fan-out·멱등까지 확정. 전달방식 표는 [`ToDoList.md`](../ToDoList.md).
 
 #### 🏷️ 장르·태그 (Genre/Tag)
 - **목적**: 지금은 연령등급·상태뿐. 탐색·랭킹·관심설정·추천의 공통 받침대.
