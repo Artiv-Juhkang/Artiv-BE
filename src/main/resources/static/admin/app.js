@@ -10,6 +10,10 @@
   const ISTATUS = { PENDING: '대기', ANSWERED: '답변완료', CLOSED: '종료' };
   const CONSENT_LABEL = { TERMS_OF_SERVICE: '서비스 이용약관', PRIVACY_POLICY: '개인정보 처리방침', MARKETING_EMAIL: '마케팅 수신', ADULT_CONTENT_19: '성인 콘텐츠 열람' };
   const CREQ_STATUS = { PENDING: '대기', APPROVED: '승인', REJECTED: '거부' };
+  const PCAT = { RECOMMEND: '추천', FREE: '자유', FANART: '팬아트', QUESTION: '질문' };
+  const RREASON = { SPAM: '스팸', ABUSE: '욕설', SEXUAL: '음란', COPYRIGHT: '저작권', ETC: '기타' };
+  const RSTATUS = { PENDING: '접수', RESOLVED: '처리', DISMISSED: '기각' };
+  const RTYPE = { POST: '게시글', COMMENT: '댓글', USER: '사용자', SERIES: '작품', EPISODE: '회차' };
 
   const state = {
     token: localStorage.getItem('apptoon_token') || null,
@@ -158,7 +162,8 @@
   // ====================================================================
   function navItems() {
     if (state.user.role === 'ADMIN') {
-      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리'], ['admin-creator-requests', '작가 신청']];
+      return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리'],
+        ['admin-creator-requests', '작가 신청'], ['admin-reports', '신고 관리'], ['admin-community', '커뮤니티 관리']];
     }
     return [['dashboard', '내 작품'], ['create', '작품 등록'], ['followers', '팔로워'], ['inquiries', '문의']];
   }
@@ -312,6 +317,8 @@
     if (v === 'admin-creator-requests') return viewAdminCreatorRequests();
     if (v === 'inquiries') return viewMyInquiries();
     if (v === 'followers') return viewFollowers();
+    if (v === 'admin-reports') return viewAdminReports();
+    if (v === 'admin-community') return viewAdminCommunity();
   }
 
   // ====================================================================
@@ -963,6 +970,89 @@
     };
     m.querySelector('[data-approve]').addEventListener('click', () => act('approve'));
     m.querySelector('[data-reject]').addEventListener('click', () => act('reject'));
+  }
+
+  // ====================================================================
+  // 관리자 — 신고 관리
+  // ====================================================================
+  let adminReportStatus = 'PENDING';
+  function viewAdminReports() {
+    const chips = [['', '전체'], ['PENDING', '접수'], ['RESOLVED', '처리'], ['DISMISSED', '기각']];
+    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>신고 관리</h1>
+      <p>접수된 신고를 검토하고 처리/기각하세요 (게시글·댓글은 신고 5건 시 자동 블라인드)</p></div></div>
+      <div class="filters" id="rp-filter">${chips.map(([v, l]) =>
+        `<button class="chip" data-v="${v}" ${v === adminReportStatus ? 'aria-current="true"' : ''}>${l}</button>`).join('')}</div>
+      <div id="rp-list">${loading}</div>`);
+    $('#rp-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { adminReportStatus = b.dataset.v; viewAdminReports(); } });
+    loadReports();
+  }
+  async function loadReports() {
+    const list = $('#rp-list'); if (list) list.innerHTML = loading;
+    try {
+      const q = `size=50${adminReportStatus ? `&status=${adminReportStatus}` : ''}`;
+      const page = await api('GET', `/api/admin/reports?${q}`);
+      $('#rp-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(reportRow).join('')}</div>`
+        : emptyBox('신고가 없어요', '조건을 바꿔보세요.');
+      $('#rp-list').addEventListener('click', onReportClick);
+    } catch (e) { $('#rp-list').innerHTML = errBox(e); }
+  }
+  function rStatusTag(s) { const cls = s === 'RESOLVED' ? 'tag--on' : (s === 'DISMISSED' ? 'tag--off' : ''); return `<span class="tag ${cls}">${RSTATUS[s] || s}</span>`; }
+  function reportRow(r) {
+    const when = r.createdAt ? new Date(r.createdAt).toLocaleDateString('ko-KR') : '';
+    const actions = r.status === 'PENDING'
+      ? `<button class="btn btn--sm" data-act="resolve" data-id="${r.id}">처리</button>
+         <button class="btn btn--ghost btn--sm" data-act="dismiss" data-id="${r.id}">기각</button>`
+      : '';
+    return `<div class="row"><span class="row__no mono">#${r.id}</span>
+      <div class="row__main"><div class="t">${RTYPE[r.targetType] || r.targetType} #${r.targetId} · ${RREASON[r.reason] || r.reason}</div>
+        <div class="s">신고자 ${esc(r.reporterNickname)}${r.detail ? ' · ' + esc(r.detail) : ''} · ${when}</div></div>
+      <div class="row__side">${rStatusTag(r.status)}${actions}</div></div>`;
+  }
+  async function onReportClick(e) {
+    const btn = e.target.closest('[data-act]'); if (!btn) return;
+    try { await api('PATCH', `/api/admin/reports/${btn.dataset.id}/${btn.dataset.act}`, { json: {} });
+      toast(btn.dataset.act === 'resolve' ? '처리했어요' : '기각했어요', 'ok'); loadReports(); }
+    catch (err) { toast(errMsg(err), 'err'); }
+  }
+
+  // ====================================================================
+  // 관리자 — 커뮤니티 관리
+  // ====================================================================
+  function viewAdminCommunity() {
+    setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>커뮤니티 관리</h1>
+      <p>블라인드 포함 전체 게시글. 가리거나 삭제하세요</p></div></div>
+      <div id="pc-list">${loading}</div>`);
+    loadAdminPosts();
+  }
+  async function loadAdminPosts() {
+    const list = $('#pc-list'); if (list) list.innerHTML = loading;
+    try {
+      const page = await api('GET', '/api/admin/posts?size=50');
+      $('#pc-list').innerHTML = page.content.length
+        ? `<div class="rows">${page.content.map(adminPostRow).join('')}</div>`
+        : emptyBox('게시글이 없어요', '아직 작성된 글이 없어요.');
+      $('#pc-list').addEventListener('click', onAdminPostClick);
+    } catch (e) { $('#pc-list').innerHTML = errBox(e); }
+  }
+  function adminPostRow(p) {
+    const when = p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR') : '';
+    return `<div class="row" ${p.blinded ? 'style="opacity:.6"' : ''}><span class="row__no mono">#${p.id}</span>
+      <div class="row__main"><div class="t">${esc(p.title)} ${p.blinded ? '<span class="tag tag--19">블라인드</span>' : ''}</div>
+        <div class="s">${PCAT[p.category] || p.category} · ${esc(p.authorNickname)} · ♡${p.likeCount} · ${when}</div></div>
+      <div class="row__side">
+        ${p.blinded ? `<button class="btn btn--sm" data-act="unblind" data-id="${p.id}">해제</button>`
+          : `<button class="btn btn--ghost btn--sm" data-act="blind" data-id="${p.id}">블라인드</button>`}
+        <button class="btn btn--ghost btn--sm" data-act="delete" data-id="${p.id}">삭제</button></div></div>`;
+  }
+  async function onAdminPostClick(e) {
+    const btn = e.target.closest('[data-act]'); if (!btn) return;
+    const id = btn.dataset.id, act = btn.dataset.act;
+    try {
+      if (act === 'delete') { await api('DELETE', `/api/posts/${id}`); toast('삭제했어요', 'ok'); }
+      else { await api('PATCH', `/api/admin/posts/${id}/${act}`); toast(act === 'blind' ? '블라인드했어요' : '해제했어요', 'ok'); }
+      loadAdminPosts();
+    } catch (err) { toast(errMsg(err), 'err'); }
   }
 
   // ---- helpers ----
