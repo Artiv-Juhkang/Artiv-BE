@@ -103,6 +103,40 @@ class CreatorRequestFlowTest {
     }
 
     @Test
+    void 승인을_거부로_정정하면_작가에서_독자로_되돌아간다() throws Exception {
+        long id = submit(readerToken);
+        mockMvc.perform(patch("/api/admin/creator-requests/" + id + "/approve")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$.role").value("CREATOR"));
+
+        mockMvc.perform(patch("/api/admin/creator-requests/" + id + "/reject")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"adminNote\":\"오클릭 정정\"}"))
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$.role").value("READER"));
+    }
+
+    @Test
+    void 거부를_승인으로_정정하면_작가가_된다() throws Exception {
+        long id = submit(readerToken);
+        mockMvc.perform(patch("/api/admin/creator-requests/" + id + "/reject")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+
+        mockMvc.perform(patch("/api/admin/creator-requests/" + id + "/approve")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$.role").value("CREATOR"));
+    }
+
+    @Test
     void 이미_신청중이면_중복신청할_수_없다_400() throws Exception {
         submit(readerToken);
         mockMvc.perform(post("/api/users/me/creator-request")

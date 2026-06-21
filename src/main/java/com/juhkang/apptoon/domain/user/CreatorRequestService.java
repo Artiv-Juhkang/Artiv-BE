@@ -50,7 +50,10 @@ public class CreatorRequestService {
     public CreatorRequestAdminResponse approve(Long adminId, Long requestId, String note) {
         CreatorRequest request = loadRequest(requestId);
         request.approve(adminId, note);
-        loadUser(request.getUserId()).changeRole(Role.CREATOR);
+        User applicant = loadUser(request.getUserId());
+        if (applicant.getRole() == Role.READER) {
+            applicant.changeRole(Role.CREATOR); // 독자만 승격(이미 작가/관리자는 그대로)
+        }
         return toAdmin(request);
     }
 
@@ -58,6 +61,10 @@ public class CreatorRequestService {
     public CreatorRequestAdminResponse reject(Long adminId, Long requestId, String note) {
         CreatorRequest request = loadRequest(requestId);
         request.reject(adminId, note);
+        User applicant = loadUser(request.getUserId());
+        if (applicant.getRole() == Role.CREATOR) {
+            applicant.changeRole(Role.READER); // 승인 정정 시 작가만 강등(관리자 보호)
+        }
         return toAdmin(request);
     }
 

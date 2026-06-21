@@ -1,0 +1,65 @@
+package com.juhkang.apptoon.domain.follow;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.juhkang.apptoon.domain.follow.dto.FollowStatsResponse;
+import com.juhkang.apptoon.domain.follow.dto.FollowUserResponse;
+import com.juhkang.apptoon.domain.user.User;
+import com.juhkang.apptoon.domain.user.UserRepository;
+import com.juhkang.apptoon.global.exception.BusinessException;
+import com.juhkang.apptoon.global.exception.ErrorCode;
+import com.juhkang.apptoon.global.storage.ImageStorageService;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class FollowService {
+
+    private final FollowRepository followRepository;
+    private final UserRepository userRepository;
+    private final ImageStorageService imageStorageService;
+
+    @Transactional
+    public void follow(Long followerId, Long targetId) {
+        if (followerId.equals(targetId)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT); // 자기 자신 팔로우 불가
+        }
+        if (!userRepository.existsById(targetId)) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+        if (followRepository.existsByFollowerIdAndFollowingId(followerId, targetId)) {
+            return; // 멱등
+        }
+        followRepository.save(Follow.create(followerId, targetId));
+    }
+
+    @Transactional
+    public void unfollow(Long followerId, Long targetId) {
+        followRepository.deleteByFollowerIdAndFollowingId(followerId, targetId);
+    }
+
+    public List<FollowUserResponse> getFollowing(Long userId) {
+        return followRepository.findFollowingUsers(userId).stream().map(this::toUser).toList();
+    }
+
+    public List<FollowUserResponse> getFollowers(Long userId) {
+        return followRepository.findFollowerUsers(userId).stream().map(this::toUser).toList();
+    }
+
+    public FollowStatsResponse getStats(Long viewerId, Long targetId) {
+        return new FollowStatsResponse(
+                followRepository.countByFollowingId(targetId),
+                followRepository.countByFollowerId(targetId),
+                followRepository.existsByFollowerIdAndFollowingId(viewerId, targetId));
+    }
+
+    private FollowUserResponse toUser(User u) {
+        String avatarUrl = u.getAvatarKey() != null ? imageStorageService.urlFor(u.getAvatarKey()) : null;
+        return new FollowUserResponse(u.getId(), u.getNickname(), avatarUrl);
+    }
+}

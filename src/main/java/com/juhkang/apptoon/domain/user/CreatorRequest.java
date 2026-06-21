@@ -3,8 +3,6 @@ package com.juhkang.apptoon.domain.user;
 import java.time.Instant;
 
 import com.juhkang.apptoon.global.entity.BaseEntity;
-import com.juhkang.apptoon.global.exception.BusinessException;
-import com.juhkang.apptoon.global.exception.ErrorCode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -70,10 +68,8 @@ public class CreatorRequest extends BaseEntity {
         review(CreatorRequestStatus.REJECTED, adminId, adminNote);
     }
 
+    /** 결정은 재처리 가능(관리자 오클릭 정정). 역할 조정은 서비스가 안전하게 수행. */
     private void review(CreatorRequestStatus next, Long adminId, String adminNote) {
-        if (!isPending()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT); // 이미 처리된 신청
-        }
         this.status = next;
         this.reviewedBy = adminId;
         this.adminNote = adminNote;

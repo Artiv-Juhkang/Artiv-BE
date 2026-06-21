@@ -160,7 +160,7 @@
     if (state.user.role === 'ADMIN') {
       return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리'], ['admin-creator-requests', '작가 신청']];
     }
-    return [['dashboard', '내 작품'], ['create', '작품 등록'], ['inquiries', '문의']];
+    return [['dashboard', '내 작품'], ['create', '작품 등록'], ['followers', '팔로워'], ['inquiries', '문의']];
   }
 
   function renderShell(inner) {
@@ -311,6 +311,7 @@
     if (v === 'admin-inquiries') return viewAdminInquiries();
     if (v === 'admin-creator-requests') return viewAdminCreatorRequests();
     if (v === 'inquiries') return viewMyInquiries();
+    if (v === 'followers') return viewFollowers();
   }
 
   // ====================================================================
@@ -867,6 +868,32 @@
   }
 
   // ====================================================================
+  // 작가 — 팔로워
+  // ====================================================================
+  async function viewFollowers() {
+    setMain(`<div class="page-head"><div><span class="eyebrow">Creator</span><h1>팔로워</h1>
+      <p>나를 팔로우하는 독자들</p></div></div>
+      <div class="stats-row" id="fl-stats">${loading}</div>
+      <div id="fl-list">${loading}</div>`);
+    try {
+      const [stats, list] = await Promise.all([
+        api('GET', `/api/users/${state.user.id}/follow-stats`),
+        api('GET', '/api/users/me/followers'),
+      ]);
+      $('#fl-stats').innerHTML = stat(stats.followerCount, '팔로워') + stat(stats.followingCount, '팔로잉');
+      $('#fl-list').innerHTML = list.length
+        ? `<div class="rows">${list.map(followerRow).join('')}</div>`
+        : emptyBox('아직 팔로워가 없어요', '작품과 소식으로 독자를 모아보세요.');
+    } catch (e) { $('#fl-stats').innerHTML = ''; $('#fl-list').innerHTML = errBox(e); }
+  }
+  function followerRow(f) {
+    const av = f.avatarUrl
+      ? `<img class="set-avatar" src="${esc(f.avatarUrl)}" alt="">`
+      : `<div class="set-avatar set-avatar--empty">${esc((f.nickname || '?').slice(0, 1))}</div>`;
+    return `<div class="row">${av}<div class="row__main"><div class="t">${esc(f.nickname)}</div></div></div>`;
+  }
+
+  // ====================================================================
   // 관리자 — 작가 신청 관리
   // ====================================================================
   let adminCreqStatus = '';
@@ -912,31 +939,30 @@
   function openCreatorRequest(id) {
     const r = creqCache.find((x) => x.id === id);
     if (!r) return;
-    const pending = r.status === 'PENDING';
     const m = document.createElement('div'); m.className = 'modal-bg';
     m.innerHTML = `<div class="modal panel">
       <h2>작가 전환 신청</h2>
       <p class="sub">${esc(r.applicantNickname)} · ${esc(r.applicantEmail)} · ${creqStatusTag(r.status)}</p>
       <div class="set-sec"><h3>신청 사유</h3><div class="iq-body">${esc(r.requestReason)}</div></div>
-      ${r.adminNote ? `<div class="set-sec"><h3>관리자 메모</h3><div class="iq-body">${esc(r.adminNote)}</div></div>` : ''}
-      ${pending ? `<hr class="divider">
-        <div class="field"><label for="cq-note">메모 (선택)</label><input id="cq-note" placeholder="승인/거부 사유"></div>
-        <div class="modal__actions">
+      <hr class="divider">
+      <div class="field"><label for="cq-note">관리자 메모 (선택)</label>
+        <input id="cq-note" value="${esc(r.adminNote || '')}" placeholder="승인/거부 사유"></div>
+      <div class="modal__actions" style="justify-content:space-between">
+        <button class="btn btn--sm" data-x>닫기</button>
+        <span style="display:flex;gap:8px">
           <button class="btn btn--ghost btn--sm" data-reject>거부</button>
-          <button class="btn btn--accent btn--sm" data-approve>승인 (작가 전환)</button></div>`
-        : '<div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div>'}</div>`;
+          <button class="btn btn--accent btn--sm" data-approve>승인 (작가 전환)</button></span></div>
+      <p class="hint" style="margin-top:8px;text-align:center">결정은 언제든 정정할 수 있어요 (승인 ↔ 거부)</p></div>`;
     document.body.appendChild(m);
     m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); });
-    if (pending) {
-      const act = async (path) => {
-        try {
-          await api('PATCH', `/api/admin/creator-requests/${id}/${path}`, { json: { adminNote: $('#cq-note', m).value || null } });
-          toast(path === 'approve' ? '승인했어요' : '거부했어요', 'ok'); m.remove(); loadCreatorRequests();
-        } catch (err) { toast(errMsg(err), 'err'); }
-      };
-      m.querySelector('[data-approve]').addEventListener('click', () => act('approve'));
-      m.querySelector('[data-reject]').addEventListener('click', () => act('reject'));
-    }
+    const act = async (path) => {
+      try {
+        await api('PATCH', `/api/admin/creator-requests/${id}/${path}`, { json: { adminNote: $('#cq-note', m).value || null } });
+        toast(path === 'approve' ? '승인했어요' : '거부했어요', 'ok'); m.remove(); loadCreatorRequests();
+      } catch (err) { toast(errMsg(err), 'err'); }
+    };
+    m.querySelector('[data-approve]').addEventListener('click', () => act('approve'));
+    m.querySelector('[data-reject]').addEventListener('click', () => act('reject'));
   }
 
   // ---- helpers ----
