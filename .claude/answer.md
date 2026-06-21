@@ -951,6 +951,24 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 21 — 팔로우 + 작가신청 결정 정정 ✅ 완료 (커밋: `feat: STEP 21 ...`)
+
+> 소셜의 시작(팔로우). 외부 0. 122개 테스트. 더불어 관리자 오클릭 대비로 작가신청 결정을 정정 가능하게.
+
+### 1) 팔로우 — 사용자↔사용자
+- V16 `follows(follower_id, following_id, UNIQUE 멱등, FK on delete cascade)`. 엔티티는 **비-연관 Long**(집계·대량조회 위주, notification/consent와 동일 선택).
+- 목록은 **JPQL 크로스 조인**으로 상대 User를 가져옴: `select u from Follow f, User u where u.id = f.followingId and f.followerId = :uid`. (연관 매핑 없이도 조인.)
+- 멱등: 팔로우 전 `existsBy...`로 중복 스킵. 가드: 자기 자신 차단, 없는 유저 404.
+- 엔드포인트: `POST/DELETE /api/users/{id}/follow`, `GET /me/following·/me/followers`, `GET /{id}/follow-stats`(팔로워수·팔로잉수·isFollowing).
+- **라우팅 주의**: `/api/users/{id}/follow`(FollowController)와 `/api/users/me/...`(UserController)가 같은 base path를 공유하지만, `me/following`·`{id}/follow-stats`는 2번째 세그먼트 리터럴이 달라 충돌 없음. Spring은 리터럴(`me`)을 `{id}`보다 우선.
+
+### 2) "재처리 허용 + 부작용은 신중하게"
+- 작가신청 결정을 **언제든 정정**(가드 제거): 관리자가 잘못 누른 승인/거부를 뒤집을 수 있게.
+- 단 **역할 변경은 조건부**: 승인은 신청자가 **READER일 때만** CREATOR 승격(이미 작가/관리자는 무변경), 거부 되돌림은 **CREATOR일 때만** READER 강등. → 다른 경로(관리자 직접 부여 등)로 권한 받은 사용자를 잘못 강등하는 사고 방지. **"상태 전이는 자유롭게, 사이드이펙트는 보수적으로."**
+- 테스트로 양방향 정정(승인→거부 강등 / 거부→승인 승격) 검증.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
