@@ -4,6 +4,7 @@
 
   const AGE = { ALL: '전체', AGE_12: '12세', AGE_15: '15세', AGE_19: '19세' };
   const STATUS = { ONGOING: '연재중', COMPLETED: '완결', HIATUS: '휴재' };
+  const GENRE = { ROMANCE: '로맨스', FANTASY: '판타지', ACTION: '액션', DRAMA: '드라마', DAILY: '일상', COMEDY: '코미디', THRILLER: '스릴러', SPORTS: '스포츠', HORROR: '공포', ETC: '기타' };
   const DAYS = [['MONDAY','월'],['TUESDAY','화'],['WEDNESDAY','수'],['THURSDAY','목'],['FRIDAY','금'],['SATURDAY','토'],['SUNDAY','일']];
   const ITYPE = { ACCOUNT: '계정', PAYMENT: '결제', CONTENT: '콘텐츠·신고', CREATOR: '작가·작품', BUG: '오류', ETC: '기타' };
   const ISTATUS = { PENDING: '대기', ANSWERED: '답변완료', CLOSED: '종료' };
@@ -281,6 +282,7 @@
       <div class="card__meta">
         <span class="tag ${s.ageRating === 'AGE_19' ? 'tag--19' : ''}">${AGE[s.ageRating] || s.ageRating}</span>
         <span class="tag">${STATUS[s.status] || s.status}</span>
+        ${s.genre ? `<span class="tag">${GENRE[s.genre] || s.genre}</span>` : ''}
         ${s.adultOnly ? '<span class="tag tag--adult">성인전용</span>' : ''}
       </div>
       <div class="card__actions">
@@ -312,6 +314,10 @@
             ${Object.entries(AGE).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
           <div class="field"><label for="c-status">연재 상태</label><select id="c-status">
             ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+          <div class="field"><label for="c-genre">장르</label><select id="c-genre">
+            ${Object.entries(GENRE).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+          <div class="field full"><label for="c-tags">태그 <span class="hint">(쉼표로 구분 · 최대 10개)</span></label>
+            <input id="c-tags" placeholder="예) 회귀, 먼치킨, 학원물" /></div>
           <div class="field full"><label>연재 요일</label>
             <div class="checks" id="c-days">${DAYS.map(([k, v]) => `<label class="check"><input type="checkbox" value="${k}"><span>${v}</span></label>`).join('')}</div>
             <span class="hint">하나 이상 선택</span></div>
@@ -330,6 +336,8 @@
     const title = $('#c-title').value.trim();
     const publishDays = [...document.querySelectorAll('#c-days input:checked')].map((i) => i.value);
     const ageRating = $('#c-age').value, adultOnly = $('#c-adult').checked;
+    const genre = $('#c-genre').value;
+    const tags = $('#c-tags').value.split(',').map((t) => t.trim()).filter(Boolean);
     if (!title) return toast('제목을 입력하세요', 'err');
     if (!publishDays.length) return toast('연재 요일을 하나 이상 선택하세요', 'err');
     if (adultOnly && ageRating !== 'AGE_19') return toast('성인 전용은 19세 등급에서만 가능해요', 'err');
@@ -337,7 +345,7 @@
     try {
       await api('POST', '/api/series', { json: {
         title, description: $('#c-desc').value.trim(), ageRating,
-        status: $('#c-status').value, publishDays, adultOnly,
+        status: $('#c-status').value, publishDays, adultOnly, genre, tags,
       } });
       toast('작품을 등록했어요', 'ok');
       state.view = 'dashboard'; route();

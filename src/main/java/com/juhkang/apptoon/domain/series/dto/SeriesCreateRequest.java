@@ -4,6 +4,7 @@ import java.time.DayOfWeek;
 import java.util.Set;
 
 import com.juhkang.apptoon.domain.series.AgeRating;
+import com.juhkang.apptoon.domain.series.Genre;
 import com.juhkang.apptoon.domain.series.SeriesStatus;
 
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,8 @@ public record SeriesCreateRequest(
         @NotNull AgeRating ageRating,
         @NotNull SeriesStatus status,
         @NotEmpty Set<DayOfWeek> publishDays,
-        Boolean adultOnly
+        Boolean adultOnly,
+        Genre genre,
+        Set<String> tags
 ) {
 }

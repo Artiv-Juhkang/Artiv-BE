@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
 import com.juhkang.apptoon.domain.auth.AuthSupport;
+import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsRequest;
+import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.global.dto.IdResponse;
 import com.juhkang.apptoon.global.dto.PageResponse;
@@ -47,11 +50,21 @@ public class SeriesController {
     public PageResponse<SeriesSummaryResponse> list(
             @RequestParam(required = false) DayOfWeek day,
             @RequestParam(required = false) AgeRating ageRating,
+            @RequestParam(required = false) Genre genre,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean adultOnly,
+            @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "LATEST") SeriesSort sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        return seriesService.getList(day, ageRating, keyword, adultOnly, sort, pageable);
+        return seriesService.getList(day, ageRating, genre, keyword, adultOnly, tag, sort, pageable);
+    }
+
+    @PatchMapping("/{id}/genre-tags")
+    @PreAuthorize("hasRole('CREATOR')")
+    public SeriesGenreTagsResponse updateGenreTags(@AuthenticationPrincipal Long userId,
+                                                   @PathVariable Long id,
+                                                   @Valid @RequestBody SeriesGenreTagsRequest request) {
+        return seriesService.updateGenreTags(userId, id, request.genre(), request.tags());
     }
 
     @GetMapping("/mine")

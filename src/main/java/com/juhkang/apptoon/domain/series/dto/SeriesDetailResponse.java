@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Set;
 
 import com.juhkang.apptoon.domain.series.AgeRating;
+import com.juhkang.apptoon.domain.series.Genre;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesStatus;
 
@@ -19,7 +20,9 @@ public record SeriesDetailResponse(
         String authorNickname,
         AgeRating ageRating,
         SeriesStatus status,
+        Genre genre,
         Set<DayOfWeek> publishDays,
+        Set<String> tags,
         boolean visible,
         boolean adultOnly,
         Instant createdAt,
@@ -36,7 +39,9 @@ public record SeriesDetailResponse(
                 series.getAuthor().getNickname(),
                 series.getAgeRating(),
                 series.getStatus(),
+                series.getGenre(),
                 Set.copyOf(series.getPublishDays()), // LAZY 컬렉션을 트랜잭션 안에서 즉시 복사(세션밖 직렬화 방지)
+                Set.copyOf(series.getTags()),        // 태그도 동일하게 트랜잭션 안에서 복사
                 series.isVisible(),
                 series.isAdultOnly(),
                 series.getCreatedAt(),

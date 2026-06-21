@@ -60,6 +60,15 @@ public class Series extends BaseEntity {
     @Column(name = "publish_day", length = 10)
     private Set<DayOfWeek> publishDays = new HashSet<>();
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Genre genre = Genre.ETC;
+
+    @ElementCollection
+    @CollectionTable(name = "series_tags", joinColumns = @JoinColumn(name = "series_id"))
+    @Column(name = "tag", length = 30)
+    private Set<String> tags = new HashSet<>();
+
     @Column(nullable = false)
     private boolean visible = true;
 
@@ -95,6 +104,16 @@ public class Series extends BaseEntity {
 
     public void changeVisibility(boolean visible) {
         this.visible = visible;
+    }
+
+    public void changeGenre(Genre genre) {
+        this.genre = genre;
+    }
+
+    /** 태그 전체 교체(정규화된 집합을 받음). 관리형 컬렉션을 clear+addAll로 안전하게 갱신. */
+    public void replaceTags(Set<String> tags) {
+        this.tags.clear();
+        this.tags.addAll(tags);
     }
 
     public void changeAdultOnly(boolean adultOnly) {

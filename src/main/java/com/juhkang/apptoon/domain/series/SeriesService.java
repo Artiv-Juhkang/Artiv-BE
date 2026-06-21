@@ -1,7 +1,11 @@
 package com.juhkang.apptoon.domain.series;
 
 import java.time.DayOfWeek;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +18,7 @@ import com.juhkang.apptoon.domain.episode.EpisodeStatus;
 import com.juhkang.apptoon.domain.personalization.SubscriptionRepository;
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
+import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.domain.user.User;
@@ -47,15 +52,43 @@ public class SeriesService {
                 request.publishDays(),
                 Boolean.TRUE.equals(request.adultOnly())
         );
+        series.changeGenre(request.genre() != null ? request.genre() : Genre.ETC);
+        series.replaceTags(normalizeTags(request.tags()));
         return seriesRepository.save(series).getId();
     }
 
-    public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, String keyword,
-                                                       Boolean adultOnly, SeriesSort sort, Pageable pageable) {
+    @Transactional
+    public SeriesGenreTagsResponse updateGenreTags(Long authorId, Long seriesId, Genre genre, Set<String> tags) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!series.isAuthoredBy(authorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        series.changeGenre(genre != null ? genre : Genre.ETC);
+        series.replaceTags(normalizeTags(tags));
+        return new SeriesGenreTagsResponse(series.getGenre(), List.copyOf(series.getTags()));
+    }
+
+    public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, Genre genre, String keyword,
+                                                       Boolean adultOnly, String tag, SeriesSort sort, Pageable pageable) {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort());
-        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, keyword, adultOnly, sorted)
+        String normTag = (tag != null && !tag.isBlank()) ? tag.strip() : null;
+        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, genre, keyword, adultOnly, normTag, sorted)
                 .map(SeriesSummaryResponse::of);
         return PageResponse.from(page);
+    }
+
+    /** 태그 정규화: 공백 제거·빈값/초과길이 제외·중복 제거·최대 10개. */
+    private Set<String> normalizeTags(Set<String> raw) {
+        if (raw == null) {
+            return Set.of();
+        }
+        return raw.stream()
+                .filter(Objects::nonNull)
+                .map(String::strip)
+                .filter(t -> !t.isBlank() && t.length() <= 30)
+                .limit(10)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     public List<SeriesSummaryResponse> getMySeries(Long authorId) {
