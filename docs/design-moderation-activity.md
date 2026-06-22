@@ -18,7 +18,7 @@
 | **2. 커뮤니티 관리 상세·검색** | PostAdminDetailResponse(content·images) + `GET /api/admin/posts/{id}` + `findForAdmin`(category·제목키워드·블라인드필터) + 콘솔 검색·필터·상세 모달 | ✅ **완료(STEP 23)** |
 | **3. 인앱 알림 저장소** | V20 notifications(폴리모픽·title/message·read_at·dedup_key) + Notification 엔티티/enum + NotificationService(fanOut 멱등·getMine(종류필터)·unreadCount·unreadSummary·markRead(라우팅정보 반환)/markAllRead) + NotificationController(폴링 API) + INQUIRY_ANSWERED 배선 + 콘솔 알림 벨(폴링 배지·종류탭·읽음·라우팅) | ✅ **완료(STEP 24)** |
 | **4. 이벤트 연결 + 멘션** | **인라인 동기 fanOut**(이벤트 아키텍처 폐기 — 설계 패널 결정) → POST_COMMENT·COMMENT_REPLY(평탄화 부모)·FOLLOWED·POST_MENTIONED·EPISODE_PUBLISHED. 멘션=`@닉네임` 정규식 파싱(Mention 테이블 없이 알림이 기록). **닉네임 고유화**(V21 unique+가입/변경 검사, @Pattern으로 멘션문자셋 일치, NFC 정규화) | ✅ **완료(STEP 25)** |
-| **5. 독자 서재 / 활동내역** | `GET /api/me/activity?type=`(열람·관심·구독·내글·내댓글·추천·언급, 런타임 조합) + `GET /api/me/posts·/post-comments·/liked-posts·/mentioned` | ⬜ |
+| **5. 독자 서재 / 활동내역** | **신규 4종**: `/api/me/read-history`·`/posts`·`/post-comments`·`/liked-posts`(런타임 조합·블라인드 비대칭·N+1 배치·고정정렬 sort-strip). **재사용 코드0**: subscriptions·bookmarks·멘션(`?type=POST_MENTIONED`). 콘솔 생략(독자 기능) | ✅ **완료(STEP 26)** |
 | **6. 작가 소식 피드** | `GET /api/me/author-news-feed`(Follow JOIN Post 최신순) + `GET /api/authors/{id}/posts` | ⬜ |
 | **7. (외부) 푸시** | FcmService.pushAsync(recipientId) — NotificationService.fanOut 후처리. SSE 실시간(폴링 위 승격). 알림 뮤트(notification_preferences)·정리 배치 | ⛔ 외부 |
 

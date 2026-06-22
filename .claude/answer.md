@@ -1061,6 +1061,29 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 26 — 독자 서재 / 활동내역 (Phase 5: 런타임 조합·재사용) ✅ 완료 (커밋: `feat: STEP 26 ...`)
+
+> 서재(열람·관심·구독)+활동(내 글·내 댓글·추천·언급)을 **별도 테이블 없이 기존 도메인 조합**으로. 설계 패널이 "재사용 vs 신규" 경계를 확정. 163테스트. **사용자가 프로브 테스트로 sort 500 버그를 직접 발견** → 수정 후 적대적 리뷰가 같은 버그를 독립 확인.
+
+### 1) 재사용 경계 — 이미 있는 걸 다시 만들지 않기
+- 구독(`/api/me/subscriptions`)·북마크(`/api/me/bookmarks`)·**멘션(`/api/me/notifications?type=POST_MENTIONED`)은 코드 0으로 재사용**. 멘션은 Phase4 알림이 곧 기록이라 별도 테이블/엔드포인트 불필요(YAGNI). 신규는 4종만: read-history·posts·post-comments·liked-posts.
+
+### 2) 블라인드 비대칭(의도적) + N+1 배치
+- **내 콘텐츠(내 글·내 댓글)=블라인드 포함+flag** / **타인 콘텐츠(liked-posts)=블라인드 제외**. liked-posts/post-comments의 `totalElements`는 원본 페이지(PostLike/PostComment) 기준 유지(필터로 content<size 가능 — 의도). 닉네임·원글제목은 `findAllById` Map 배치(쿼리 2개 고정).
+
+### 3) **고정 정렬 목록에 클라 `?sort=`가 들어오면 500** (사용자 프로브 발견)
+- read-history는 group-by 프로젝션 + 고정 `order by max(createdAt)`인데 Pageable의 `sort`가 쿼리에 append됨 → `?sort=createdAt`/`?sort=garbage` 시 **SQL 오류 500**(group-by 비호환/미존재 컬럼). posts 등 파생쿼리도 미존재 속성 sort→PropertyReferenceException 500. **어떤 인증 사용자든 sort 파라미터 하나로 엔드포인트를 죽일 수 있음.**
+- **수정**: `Pageables.pageOnly(pageable)`(page/size만, sort 버림)을 4개 서비스에 적용. 서버 정렬이 고정인 목록은 클라 sort를 받지 않는 게 맞다. 회귀 테스트로 4×3 sort 조합 200 단언. **기존에 PostSort enum 화이트리스트 패턴이 있었는데 신규 엔드포인트가 그걸 안 따른 게 원인** → 고정정렬은 sort-strip으로 통일.
+- read-history **2차 정렬키**(`, series.id desc`) 추가 — `max(createdAt)` 동률 시 페이지 경계 중복/누락 방지(stable pagination).
+
+### 4) 리뷰가 틀린 케이스 — FK를 안 봄
+- 리뷰가 "원글 삭제 시 내 댓글 스킵 미검증"이라 했으나 `post_comments.post_id → posts on delete cascade`라 **원글 삭제 시 댓글도 함께 삭제 → 고아 댓글 자체가 발생 불가능**. 서비스의 `Map.get` null-safety는 방어로 유지하되, 발생 불가능 시나리오라 테스트는 안 만듦. **비평도 스키마까지 봐야 — 코드만 보면 놓침.**
+
+### 5) DTO 평면 record라 LAZY 직렬화 위험 없음
+- 모든 응답이 평면 record(서비스 tx 내 완전 구성, LAZY 연관 없음)라 [[apptoon-lazy-serialization-gotcha]]의 OSIV-off 500이 발생할 수 없음 → @Transactional 테스트로 충분(직렬화는 라이브 스모크로 추가 확인).
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
