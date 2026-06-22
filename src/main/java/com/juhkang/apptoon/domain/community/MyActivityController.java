@@ -40,4 +40,10 @@ public class MyActivityController {
                                                    @PageableDefault(size = 20) Pageable pageable) {
         return postService.getMyLikedPosts(userId, pageable);
     }
+
+    @GetMapping("/author-news-feed")
+    public PageResponse<PostResponse> authorNewsFeed(@AuthenticationPrincipal Long userId,
+                                                     @PageableDefault(size = 20) Pageable pageable) {
+        return postService.getAuthorNewsFeed(userId, pageable);
+    }
 }

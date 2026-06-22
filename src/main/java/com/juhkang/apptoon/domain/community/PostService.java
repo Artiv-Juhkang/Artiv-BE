@@ -186,6 +186,23 @@ public class PostService {
                 likes.getTotalElements(), likes.getTotalPages(), likes.isLast());
     }
 
+    /** 작가 소식 피드 — 팔로우한 사용자들의 공개 글(최신순). 정렬 고정. */
+    public PageResponse<PostResponse> getAuthorNewsFeed(Long userId, Pageable pageable) {
+        return toPostResponses(postRepository.findFeedByFollower(userId, Pageables.pageOnly(pageable)));
+    }
+
+    /** 특정 작가의 공개 글(블라인드 제외, 최신순). */
+    public PageResponse<PostResponse> getAuthorPosts(Long authorId, Pageable pageable) {
+        return toPostResponses(postRepository.findByAuthorIdAndBlindedFalseOrderByIdDesc(authorId, Pageables.pageOnly(pageable)));
+    }
+
+    /** Page<Post> → PageResponse<PostResponse>(작성자 닉네임 배치, N+1 없음). */
+    private PageResponse<PostResponse> toPostResponses(Page<Post> page) {
+        Map<Long, String> names = nicknames(page.getContent());
+        return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getCategory(), p.getTitle(),
+                names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt())));
+    }
+
     private Post load(Long id) {
         return postRepository.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
     }

@@ -24,4 +24,14 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                             @Param("blinded") Boolean blinded, Pageable pageable);
 
     Page<Post> findByAuthorIdOrderByIdDesc(Long authorId, Pageable pageable);   // 내 글(블라인드 포함)
+
+    Page<Post> findByAuthorIdAndBlindedFalseOrderByIdDesc(Long authorId, Pageable pageable);   // 작가 공개글(블라인드 제외)
+
+    /** 작가 소식 피드 — 내가 팔로우한 사용자들의 공개 글, 최신순. */
+    @Query(value = "select p from Post p where p.blinded = false "
+            + "and p.authorId in (select f.followingId from Follow f where f.followerId = :userId) "
+            + "order by p.id desc",
+            countQuery = "select count(p) from Post p where p.blinded = false "
+                    + "and p.authorId in (select f.followingId from Follow f where f.followerId = :userId)")
+    Page<Post> findFeedByFollower(@Param("userId") Long userId, Pageable pageable);
 }
