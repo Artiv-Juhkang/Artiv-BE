@@ -12,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeImageResponse;
+import com.juhkang.apptoon.domain.episode.access.AccessResult;
+import com.juhkang.apptoon.domain.episode.access.EpisodeAccessEvaluator;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.apptoon.domain.notification.NotificationService;
 import com.juhkang.apptoon.domain.notification.NotificationTargetType;
@@ -44,6 +46,7 @@ public class EpisodeService {
     private final ImageStorageService imageStorageService;
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationService notificationService;
+    private final EpisodeAccessEvaluator episodeAccessEvaluator;
 
     @Transactional
     public int upload(Long userId, Long seriesId, String title, Instant publishAt, List<MultipartFile> images) {
@@ -99,9 +102,12 @@ public class EpisodeService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
         verifyVisibleAccess(series, viewerId, isAdmin);
         verifyAgeAccess(series, viewerId);
+        boolean canPreview = isAdmin || series.isAuthoredBy(viewerId);
+        Instant now = Instant.now();
+        // 목록은 PUBLISHED만 조회 → publishAt non-null 보장(쿼리를 PUBLISHED+SCHEDULED로 바꾸면 evaluate 재검토 필요).
         Slice<EpisodeSummaryResponse> slice = episodeRepository
                 .findBySeriesIdAndStatusOrderByEpisodeNoAsc(seriesId, EpisodeStatus.PUBLISHED, pageable)
-                .map(EpisodeSummaryResponse::of);
+                .map(ep -> EpisodeSummaryResponse.of(ep, episodeAccessEvaluator.evaluate(series, ep, viewerId, canPreview, now)));
         return SliceResponse.from(slice);
     }
 
@@ -120,13 +126,18 @@ public class EpisodeService {
         if (episode.getStatus() != EpisodeStatus.PUBLISHED && !canPreview) {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
-        episode.increaseViewCount(); // 더티 체킹으로 트랜잭션 종료 시 UPDATE
+        // 엔타이틀먼트 가드(수익화 0단계: 기다리면무료 시간잠금). 잠기면 이미지·조회수 없이 락정보만 반환.
+        AccessResult access = episodeAccessEvaluator.evaluate(series, episode, viewerId, canPreview, Instant.now());
+        if (!access.accessible()) {
+            return EpisodeDetailResponse.locked(episode, access);
+        }
+        episode.increaseViewCount(); // 더티 체킹으로 트랜잭션 종료 시 UPDATE — 접근 가능 시에만
         List<EpisodeImageResponse> images = episodeImageRepository.findByEpisodeIdOrderBySortOrderAsc(episode.getId()).stream()
                 .map(image -> EpisodeImageResponse.of(image, imageStorageService.urlFor(image.getPath())))
                 .toList();
         long likeCount = episodeLikeRepository.countByEpisodeId(episode.getId());
         boolean liked = episodeLikeRepository.existsByUserIdAndEpisodeId(viewerId, episode.getId());
-        return EpisodeDetailResponse.of(episode, images, likeCount, liked);
+        return EpisodeDetailResponse.of(episode, images, likeCount, liked, access);
     }
 
     @Transactional

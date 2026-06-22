@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Genre;
+import com.juhkang.apptoon.domain.series.ReleasePolicy;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesStatus;
 
@@ -25,6 +26,8 @@ public record SeriesDetailResponse(
         Set<String> tags,
         boolean visible,
         boolean adultOnly,
+        ReleasePolicy releasePolicy,
+        Integer waitFreeDays,
         Instant createdAt,
         int episodeCount,
         int latestEpisodeNo,
@@ -44,6 +47,8 @@ public record SeriesDetailResponse(
                 Set.copyOf(series.getTags()),        // 태그도 동일하게 트랜잭션 안에서 복사
                 series.isVisible(),
                 series.isAdultOnly(),
+                series.getReleasePolicy(),
+                series.getWaitFreeDays(),
                 series.getCreatedAt(),
                 episodeCount,
                 latestEpisodeNo,

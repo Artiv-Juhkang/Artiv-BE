@@ -1,5 +1,6 @@
 package com.juhkang.apptoon.domain.personalization;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.apptoon.domain.episode.Episode;
 import com.juhkang.apptoon.domain.episode.EpisodeRepository;
 import com.juhkang.apptoon.domain.episode.EpisodeStatus;
+import com.juhkang.apptoon.domain.episode.access.EpisodeAccessEvaluator;
 import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
 import com.juhkang.apptoon.domain.personalization.dto.ReadHistoryResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
@@ -40,6 +42,7 @@ public class PersonalizationService {
     private final SeriesAccessChecker seriesAccessChecker;
     private final EpisodeRepository episodeRepository;
     private final UserRepository userRepository;
+    private final EpisodeAccessEvaluator episodeAccessEvaluator;
 
     @Transactional
     public void subscribe(Long userId, Long seriesId) {
@@ -63,7 +66,13 @@ public class PersonalizationService {
     public void markRead(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
-        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
+        Series series = episode.getSeries();
+        seriesAccessChecker.verifyInteractable(series, userId);
+        // 잠긴(기다리면무료 미전환) 회차는 실제 열람 불가 → 읽음 기록 안 함(UP·이어보기·서재 신호 정확성 + 미래 PAID seam).
+        boolean isPrivileged = series.isAuthoredBy(userId);
+        if (!episodeAccessEvaluator.evaluate(series, episode, userId, isPrivileged, Instant.now()).accessible()) {
+            return;
+        }
         if (readLogRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 읽음
         }

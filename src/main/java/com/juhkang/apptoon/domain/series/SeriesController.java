@@ -24,6 +24,8 @@ import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
 import com.juhkang.apptoon.domain.auth.AuthSupport;
 import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsResponse;
+import com.juhkang.apptoon.domain.series.dto.SeriesReleasePolicyRequest;
+import com.juhkang.apptoon.domain.series.dto.SeriesReleasePolicyResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.global.dto.IdResponse;
 import com.juhkang.apptoon.global.dto.PageResponse;
@@ -65,6 +67,14 @@ public class SeriesController {
                                                    @PathVariable Long id,
                                                    @Valid @RequestBody SeriesGenreTagsRequest request) {
         return seriesService.updateGenreTags(userId, id, request.genre(), request.tags());
+    }
+
+    @PatchMapping("/{id}/release-policy")
+    @PreAuthorize("hasRole('CREATOR')")
+    public SeriesReleasePolicyResponse updateReleasePolicy(@AuthenticationPrincipal Long userId,
+                                                           @PathVariable Long id,
+                                                           @Valid @RequestBody SeriesReleasePolicyRequest request) {
+        return seriesService.updateReleasePolicy(userId, id, request.mode(), request.waitFreeDays());
     }
 
     @GetMapping("/mine")

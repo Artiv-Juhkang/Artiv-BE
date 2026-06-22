@@ -75,6 +75,15 @@ public class Series extends BaseEntity {
     @Column(nullable = false)
     private boolean adultOnly = false;
 
+    // 수익화 0단계: 작품 공개정책(결제 없음). 기존 작품은 V22에서 FREE_ALL backfill.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "release_policy", nullable = false, length = 20)
+    private ReleasePolicy releasePolicy = ReleasePolicy.FREE_ALL;
+
+    /** WAIT_FREE 무료전환 주기(일). 불변식: non-null ⟺ WAIT_FREE. */
+    @Column(name = "wait_free_days")
+    private Integer waitFreeDays;
+
     private Series(String title, String description, User author, AgeRating ageRating, SeriesStatus status,
                    Set<DayOfWeek> publishDays, boolean adultOnly) {
         this.title = title;
@@ -119,6 +128,20 @@ public class Series extends BaseEntity {
     public void changeAdultOnly(boolean adultOnly) {
         this.adultOnly = adultOnly;
         validateAdultConsistency();
+    }
+
+    /** 작가 공개정책 변경. FREE_ALL로 바꾸면 waitFreeDays 잔여값을 청소(불변식 유지). */
+    public void changeReleasePolicy(ReleasePolicy policy, Integer waitFreeDays) {
+        this.releasePolicy = policy;
+        this.waitFreeDays = (policy == ReleasePolicy.WAIT_FREE) ? waitFreeDays : null;
+        validateReleasePolicy();
+    }
+
+    /** 불변식: WAIT_FREE면 waitFreeDays>0, FREE_ALL이면 null. */
+    private void validateReleasePolicy() {
+        if (releasePolicy == ReleasePolicy.WAIT_FREE && (waitFreeDays == null || waitFreeDays <= 0)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
     }
 
     /** 불변식: 성인 전용(adultOnly)은 연령등급이 AGE_19 여야 한다. */

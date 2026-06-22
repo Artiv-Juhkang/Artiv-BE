@@ -19,6 +19,7 @@ import com.juhkang.apptoon.domain.personalization.SubscriptionRepository;
 import com.juhkang.apptoon.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.apptoon.domain.series.dto.SeriesDetailResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesGenreTagsResponse;
+import com.juhkang.apptoon.domain.series.dto.SeriesReleasePolicyResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesResponse;
 import com.juhkang.apptoon.domain.series.dto.SeriesSummaryResponse;
 import com.juhkang.apptoon.domain.user.User;
@@ -67,6 +68,19 @@ public class SeriesService {
         series.changeGenre(genre != null ? genre : Genre.ETC);
         series.replaceTags(normalizeTags(tags));
         return new SeriesGenreTagsResponse(series.getGenre(), List.copyOf(series.getTags()));
+    }
+
+    /** 작가 공개정책(수익화 0단계) 변경 — 작가 본인만. WAIT_FREE면 waitFreeDays>0(엔티티 불변식). */
+    @Transactional
+    public SeriesReleasePolicyResponse updateReleasePolicy(Long authorId, Long seriesId,
+                                                           ReleasePolicy mode, Integer waitFreeDays) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!series.isAuthoredBy(authorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        series.changeReleasePolicy(mode, waitFreeDays);
+        return new SeriesReleasePolicyResponse(series.getReleasePolicy(), series.getWaitFreeDays());
     }
 
     public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, Genre genre, String keyword,
