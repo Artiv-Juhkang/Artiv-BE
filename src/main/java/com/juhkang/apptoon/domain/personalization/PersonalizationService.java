@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,7 +13,10 @@ import com.juhkang.apptoon.domain.episode.Episode;
 import com.juhkang.apptoon.domain.episode.EpisodeRepository;
 import com.juhkang.apptoon.domain.episode.EpisodeStatus;
 import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
+import com.juhkang.apptoon.domain.personalization.dto.ReadHistoryResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
+import com.juhkang.apptoon.global.dto.PageResponse;
+import com.juhkang.apptoon.global.dto.Pageables;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesAccessChecker;
 import com.juhkang.apptoon.domain.series.SeriesRepository;
@@ -115,5 +120,15 @@ public class PersonalizationService {
                     return new SubscriptionResponse(series.getId(), series.getTitle(), latestNo, lastReadNo, up);
                 })
                 .toList();
+    }
+
+    /** 열람한 작품(최근 열람순). 작품 제목은 배치 1쿼리로 결합 → 쿼리 2개 고정(N+1 없음). 정렬 고정(클라 sort 무시). */
+    public PageResponse<ReadHistoryResponse> getReadHistory(Long userId, Pageable pageable) {
+        Page<ReadSeriesRow> page = readLogRepository.findReadSeries(userId, Pageables.pageOnly(pageable));
+        List<Long> seriesIds = page.getContent().stream().map(ReadSeriesRow::getSeriesId).toList();
+        Map<Long, String> titleBySeries = seriesRepository.findAllById(seriesIds).stream()
+                .collect(Collectors.toMap(Series::getId, Series::getTitle));
+        return PageResponse.from(page.map(row -> new ReadHistoryResponse(
+                row.getSeriesId(), titleBySeries.get(row.getSeriesId()), row.getMaxNo(), row.getLastReadAt())));
     }
 }

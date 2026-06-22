@@ -2,13 +2,19 @@ package com.juhkang.apptoon.domain.community;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.juhkang.apptoon.domain.community.dto.MyCommentResponse;
 import com.juhkang.apptoon.domain.community.dto.PostCommentResponse;
+import com.juhkang.apptoon.global.dto.PageResponse;
+import com.juhkang.apptoon.global.dto.Pageables;
 import com.juhkang.apptoon.domain.notification.NotificationService;
 import com.juhkang.apptoon.domain.notification.NotificationTargetType;
 import com.juhkang.apptoon.domain.notification.NotificationType;
@@ -67,6 +73,23 @@ public class PostCommentService {
         notificationService.fanOut(recipients, NotificationType.POST_MENTIONED, NotificationTargetType.POST,
                 postId, actorId, "멘션 알림", "회원님이 댓글에서 언급됐어요.",
                 rid -> "CMT_MENTION:" + commentId + ":" + rid);
+    }
+
+    /** 내가 쓴 댓글·대댓글(블라인드 포함). 원글 제목/블라인드를 배치로 결합, 원글 삭제 시 행 스킵. */
+    public PageResponse<MyCommentResponse> getMyComments(Long userId, Pageable pageable) {
+        Page<PostComment> page = postCommentRepository.findByAuthorIdOrderByIdDesc(userId, Pageables.pageOnly(pageable));
+        List<Long> postIds = page.getContent().stream().map(PostComment::getPostId).distinct().toList();
+        Map<Long, Post> postById = postRepository.findAllById(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        List<MyCommentResponse> content = page.getContent().stream()
+                .map(c -> {
+                    Post post = postById.get(c.getPostId());
+                    return post == null ? null : new MyCommentResponse(c.getId(), c.getContent(), c.isBlinded(),
+                            c.getCreatedAt(), post.getId(), post.getTitle(), post.isBlinded());
+                })
+                .filter(Objects::nonNull).toList();
+        return new PageResponse<>(content, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
     public List<PostCommentResponse> getComments(Long postId) {

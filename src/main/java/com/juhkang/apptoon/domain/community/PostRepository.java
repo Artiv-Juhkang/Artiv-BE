@@ -22,4 +22,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                     + "and (:blinded is null or p.blinded = :blinded)")
     Page<Post> findForAdmin(@Param("category") PostCategory category, @Param("keyword") String keyword,
                             @Param("blinded") Boolean blinded, Pageable pageable);
+
+    Page<Post> findByAuthorIdOrderByIdDesc(Long authorId, Pageable pageable);   // 내 글(블라인드 포함)
 }

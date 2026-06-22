@@ -2,6 +2,8 @@ package com.juhkang.apptoon.domain.personalization;
 
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -12,7 +14,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.juhkang.apptoon.domain.personalization.dto.BookmarkResponse;
+import com.juhkang.apptoon.domain.personalization.dto.ReadHistoryResponse;
 import com.juhkang.apptoon.domain.personalization.dto.SubscriptionResponse;
+import com.juhkang.apptoon.global.dto.PageResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -66,5 +70,11 @@ public class PersonalizationController {
     @GetMapping("/api/me/bookmarks")
     public List<BookmarkResponse> myBookmarks(@AuthenticationPrincipal Long userId) {
         return personalizationService.getMyBookmarks(userId);
+    }
+
+    @GetMapping("/api/me/read-history")
+    public PageResponse<ReadHistoryResponse> myReadHistory(@AuthenticationPrincipal Long userId,
+                                                           @PageableDefault(size = 20) Pageable pageable) {
+        return personalizationService.getReadHistory(userId, pageable);
     }
 }

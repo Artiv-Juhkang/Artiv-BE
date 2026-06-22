@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.juhkang.apptoon.domain.community.dto.PostAdminDetailResponse;
 import com.juhkang.apptoon.domain.community.dto.PostAdminResponse;
 import com.juhkang.apptoon.domain.community.dto.PostDetailResponse;
+import com.juhkang.apptoon.domain.community.dto.MyPostResponse;
 import com.juhkang.apptoon.domain.community.dto.PostImageResponse;
 import com.juhkang.apptoon.domain.community.dto.PostResponse;
 import com.juhkang.apptoon.domain.notification.NotificationService;
@@ -24,6 +25,7 @@ import com.juhkang.apptoon.domain.notification.NotificationType;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.global.dto.PageResponse;
+import com.juhkang.apptoon.global.dto.Pageables;
 import com.juhkang.apptoon.global.exception.BusinessException;
 import com.juhkang.apptoon.global.exception.ErrorCode;
 import com.juhkang.apptoon.global.storage.ImageStorageService;
@@ -160,6 +162,28 @@ public class PostService {
         } else {
             post.unblind();
         }
+    }
+
+    /** 내가 쓴 글(블라인드 포함, 본인 것만 — userId 외 입력 없음 IDOR 안전). 정렬 고정(클라 sort 무시). */
+    public PageResponse<MyPostResponse> getMyPosts(Long userId, Pageable pageable) {
+        return PageResponse.from(postRepository.findByAuthorIdOrderByIdDesc(userId, Pageables.pageOnly(pageable)).map(MyPostResponse::of));
+    }
+
+    /** 내가 추천한 글(좋아요 시점순). 삭제·블라인드 글 제외, 좋아요 순서 보존, 닉네임 배치. 정렬 고정(클라 sort 무시). */
+    public PageResponse<PostResponse> getMyLikedPosts(Long userId, Pageable pageable) {
+        Page<PostLike> likes = postLikeRepository.findByUserIdOrderByIdDesc(userId, Pageables.pageOnly(pageable));
+        List<Long> postIds = likes.getContent().stream().map(PostLike::getPostId).toList();
+        Map<Long, Post> postById = postRepository.findAllById(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        List<Post> posts = postIds.stream().map(postById::get)
+                .filter(p -> p != null && !p.isBlinded()).toList();   // 삭제·블라인드 제외, 좋아요순 보존
+        Map<Long, String> names = nicknames(posts);
+        List<PostResponse> content = posts.stream()
+                .map(p -> new PostResponse(p.getId(), p.getCategory(), p.getTitle(),
+                        names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt()))
+                .toList();
+        return new PageResponse<>(content, likes.getNumber(), likes.getSize(),
+                likes.getTotalElements(), likes.getTotalPages(), likes.isLast());
     }
 
     private Post load(Long id) {
