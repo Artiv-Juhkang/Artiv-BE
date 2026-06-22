@@ -17,7 +17,7 @@
 | **1. 신고 상세·처리·필터** | ReportAdminDetailResponse(대상 content·author·관련신고수) + `GET /api/admin/reports/{id}` + resolve 액션(NONE/BLIND_TARGET/DELETE_TARGET) + 필터(status·targetType·reason) + 블라인드 이력(V19 blinded_by/at) + 콘솔 상세 모달 | ✅ **완료(STEP 23)** |
 | **2. 커뮤니티 관리 상세·검색** | PostAdminDetailResponse(content·images) + `GET /api/admin/posts/{id}` + `findForAdmin`(category·제목키워드·블라인드필터) + 콘솔 검색·필터·상세 모달 | ✅ **완료(STEP 23)** |
 | **3. 인앱 알림 저장소** | V20 notifications(폴리모픽·title/message·read_at·dedup_key) + Notification 엔티티/enum + NotificationService(fanOut 멱등·getMine(종류필터)·unreadCount·unreadSummary·markRead(라우팅정보 반환)/markAllRead) + NotificationController(폴링 API) + INQUIRY_ANSWERED 배선 + 콘솔 알림 벨(폴링 배지·종류탭·읽음·라우팅) | ✅ **완료(STEP 24)** |
-| **4. 이벤트 연결 + 멘션** | 도메인 이벤트(`@TransactionalEventListener` AFTER_COMMIT + @Async) → 신규회차·문의답변·게시글댓글·대댓글·팔로우 알림. **멘션**: Post/PostComment content `@닉네임` 파싱 → 알림 + Mention 저장 | ⬜ |
+| **4. 이벤트 연결 + 멘션** | **인라인 동기 fanOut**(이벤트 아키텍처 폐기 — 설계 패널 결정) → POST_COMMENT·COMMENT_REPLY(평탄화 부모)·FOLLOWED·POST_MENTIONED·EPISODE_PUBLISHED. 멘션=`@닉네임` 정규식 파싱(Mention 테이블 없이 알림이 기록). **닉네임 고유화**(V21 unique+가입/변경 검사, @Pattern으로 멘션문자셋 일치, NFC 정규화) | ✅ **완료(STEP 25)** |
 | **5. 독자 서재 / 활동내역** | `GET /api/me/activity?type=`(열람·관심·구독·내글·내댓글·추천·언급, 런타임 조합) + `GET /api/me/posts·/post-comments·/liked-posts·/mentioned` | ⬜ |
 | **6. 작가 소식 피드** | `GET /api/me/author-news-feed`(Follow JOIN Post 최신순) + `GET /api/authors/{id}/posts` | ⬜ |
 | **7. (외부) 푸시** | FcmService.pushAsync(recipientId) — NotificationService.fanOut 후처리. SSE 실시간(폴링 위 승격). 알림 뮤트(notification_preferences)·정리 배치 | ⛔ 외부 |
@@ -30,6 +30,8 @@
 - 알림 보존정책: 지금 무한, 향후 읽음+90일 정리 배치.
 - **알림 dedup은 수신자 단위**(STEP 24, 적대적 리뷰 반영): unique `(recipient_id, dedup_key)` + `existsByRecipientIdAndDedupKey`. fanOut 시그니처 `Function<Long,String>`(수신자별 키)와 정합 — 전역 유니크였다면 Phase 4 다대상 fanOut(회차/게시글)에서 한 수신자가 다른 수신자 알림을 묵음 처리하는 사일런트 드롭 발생.
 - **(보류) fanOut TOCTOU**: 동시 같은 (recipient,dedup_key) 삽입 시 부분 유니크가 두 번째를 거부→500. 1인 단일관리자 기준 사실상 불가능(CLAUDE.md 발생불가 시나리오 예외처리 금지). Phase 4 다대상·고빈도 트리거 배선 시 native upsert(ON CONFLICT DO NOTHING) 또는 REQUIRES_NEW catch-continue로 처리.
+- **(STEP 25 보류) publishDueEpisodes N+1**: 배치 발행 시 회차당 series 프록시 초기화 + 구독자 쿼리. 정확성 무결(@Transactional 내부)·순수 성능. 규모 시 `join fetch ep.series s join fetch s.author` + seriesId 그룹핑.
+- **(STEP 25 보류) 블라인드 부모 댓글 답글 알림**: 블라인드(모더레이션)된 댓글에 답글 시 그 작성자에게 COMMENT_REPLY 발화. 저빈도·저severity. 답글 자체 차단 정책과 함께 후속 검토.
 
 ## 완료(STEP 23) 엔드포인트 요약
 - `GET /api/admin/reports?status&targetType&reason` · `GET /api/admin/reports/{id}` · `PATCH .../resolve {action}` · `PATCH .../dismiss`

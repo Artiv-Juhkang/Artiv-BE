@@ -1037,6 +1037,30 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 25 — 알림 트리거 5종 + 닉네임 고유화 (Phase 4: 이벤트·멘션) ✅ 완료 (커밋: `feat: STEP 25 ...`)
+
+> 댓글·대댓글·팔로우·@멘션·새 회차를 알림에 연결. 설계 패널이 내 잠정안(이벤트 아키텍처)을 **뒤집어** 인라인 동기 fanOut 채택. 적대적 리뷰가 3건(멘션 문자셋·NFC·마이그레이션 충돌) 잡아 반영. 157테스트 + 실서버 종단검증.
+
+### 1) 아키텍처 결정 번복 — 이벤트 폐기, 인라인 동기 fanOut
+- 처음엔 `@TransactionalEventListener(AFTER_COMMIT)+@Async`로 디커플링하려 했으나, **설계 패널이 반대**: 기존 37개 `@Transactional` 테스트에서 AFTER_COMMIT은 **발화 안 됨**(커밋이 안 일어나니) → 회귀. 디커플링은 요청 안 됨. INQUIRY_ANSWERED가 이미 인라인 동기로 검증됨. → 각 Service 쓰기 메서드에서 `notificationService.fanOut(...)` 직접 호출. **단순성·테스트 결정성·원자성(같은 tx 롤백)** 승리. 멀티에이전트 비평은 명령이 아니라 입력 — 내 잠정안도 뒤집힐 수 있다.
+
+### 2) 수신자·dedup 매트릭스(5트리거)
+- POST_COMMENT(글 작성자, `POST_CMT:{commentId}`) / COMMENT_REPLY(**평탄화 부모** 작성자 — resolveParent를 `Long`→`ParentRef(effectiveParentId, parentAuthorId)`로 확장) / FOLLOWED(팔로우 당한 이, `FOLLOW:{followerId}` 영구멱등=재팔로우 무알림) / POST_MENTIONED(글·댓글 본문, `(POST|CMT)_MENTION:{id}:{rid}`) / EPISODE_PUBLISHED(구독자−작가, `EP_PUB:{episodeId}` 두 발행경로 멱등). 모두 actor/self 제외.
+
+### 3) 닉네임 고유화 — @멘션이 1명을 가리키도록
+- nickname에 unique 없었음(시드 '작가'×N). V21로 기존 중복 접미사 해소 + unique. 가입·변경 사전검사(`DUPLICATE_NICKNAME` 409). 멘션은 `findByNicknameIn`(1쿼리)로 해석. **닉네임 unique 추가 시 커밋(비-@Transactional)테스트 충돌**: AuthFlowTest/AuthServiceTest 둘 다 '닉' 커밋 → SeriesDetailSerializationTest의 deleteAll이 사이에 끼어 우연히 통과(순서의존). 내 변경이 만든 취약점이라 두 곳 고유화.
+
+### 4) 적대적 리뷰 3건 반영 (멀티에이전트가 잡은 실결함)
+- **(high) V21 접미사 재충돌**: `nick||'_'||id`가 *기존 리터럴* 닉('bob_5')과 또 겹치면 ALTER 실패 → 부팅 중단. 설계 패널은 "단일 패스로 충돌 완전 해소"라 단언했으나 **틀림**. → 충돌 없을 때까지 `_` 덧붙이는 `do $$` 루프로. **마이그레이션은 정확성>단순성**(실패 시 부팅 불가).
+- **(medium) 멘션 문자셋<닉네임 문자셋**: 닉네임은 `@Size`만이라 공백·특수문자 가능한데 멘션 regex는 한글+영숫자+_만 → 일부 유저 영구 멘션 불가(사일런트 누락). → 닉네임 DTO에 `@Pattern([\p{IsHangul}A-Za-z0-9_]{1,20})` 추가해 **유효닉=멘션가능** 일치.
+- **(low) NFD/NFC**: Apple 입력의 NFD 분해 한글 @멘션이 NFC 저장 닉과 String 불일치 → 무음 미스. → `Mentions.extract`(본문)+가입/변경(저장) 양쪽 `Normalizer.NFC`. **반쪽 정규화는 더 나쁨**(불일치 잔존)이라 양쪽.
+- 보류(노트): publishDueEpisodes 회차당 N+1(순수 성능), 블라인드 부모 댓글 답글→블라인드 작성자 알림(모더레이션 엣지).
+
+### 5) 마이그레이션 이미 적용 후 정정 패턴(재확인)
+- V21을 dev DB 적용 후 로직 정정 → `drop constraint + delete flyway_schema_history where version='21'` 후 재적용(데이터 이미 deduped라 루프 no-op + constraint 재생성). Testcontainers는 매번 fresh라 새 V21 그대로 검증.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
