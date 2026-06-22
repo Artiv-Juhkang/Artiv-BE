@@ -120,6 +120,26 @@
 - **결제 게이트웨이(PG)**: 실결제는 외부(토스/아임포트). **학습 단계엔 mock/내부코인으로 추상화**(`ObjectStorage` 추상화와 동일 전략).
 - **유료 이미지 보호**: 유료 회차면 `/files` 정적서빙을 **인증 서빙으로 승격**(현재 URL 유추 가능).
 
+### 3.5 ✅ 수익화 0단계 구현 완료 (STEP 28) — 결제 0, 작가 공개정책 + 기다리면무료
+- **모델**: `Series.releasePolicy`(FREE_ALL/WAIT_FREE) + `waitFreeDays`(Integer nullable, 불변식 WAIT_FREE⟺>0). V22 backfill=FREE_ALL. 작가 `PATCH /api/series/{id}/release-policy`(CREATOR+소유). EpisodeStatus는 불변(잠금은 상태 아님).
+- **잠금 = compute-on-read**(스케줄러·상태저장 0): `EpisodeAccessEvaluator.evaluate(series,episode,viewerId,isPrivileged,now)→AccessResult(accessible,lockReason{NONE,WAIT},freeAt)`. WAIT_FREE면 `freeAt=publishAt+waitFreeDays일`, `now>=freeAt`면 무료. 작가·admin 프리뷰는 항상 통과(publishAt-null 방어).
+- **가드 배선**: getDetail(status 가드 직후)·getEpisodes(목록 락 주입)·**markRead(잠긴 회차 읽음 no-op — UP/이어보기/서재 신호 오염 방지)**. 잠긴 회차 = **200+locked**(이미지·조회수 비노출, ErrorResponse가 freeAt 못 실어 throw 대신 플래그). 정책전환은 소급 안 잠김(과거 회차 freeAt 이미 지남=직관적, 의도된 설계).
+- **정렬·소급**: 익명열람 불가(인증 필수)라 viewerId non-null.
+
+### 3.6 🔌 미래 확장점 (재작업 0의 seam — 이 자리에 끼운다)
+| 미래 기능 | 끼우는 정확한 자리 | 0단계가 남긴 seam | 데이터 증분 |
+|---|---|---|---|
+| 엔타이틀먼트 테이블 | `EpisodeAccessEvaluator` **미래주입점 ①**(waitLocked 직전): `if(entitlementRepo.has(viewerId, episode.id)) return open()` | viewerId 이미 파라미터 | 테이블+리포 |
+| 유료미리보기(PAID) | 주입점 ① 분기 + `LockReason.PAID` enum 상수 + `AccessResult.price` 필드 | enum/record 증분 자리 | `series.preview_price` V23 add column nullable |
+| 코인/지갑 | getDetail의 PAID 분기 시 **별도 결제 유스케이스**(가드는 차감 모름=관심사 분리) | evaluate는 "열람 가능?"만 | Wallet 엔티티 |
+| 정산원장(멱등·이중기록) | 결제 유스케이스 내부 tx, 가드 무관 | — | Ledger 테이블 |
+| 멤버십 | 주입점 ①: `if(membership.covers(viewerId, series)) return open()` | series 이미 파라미터 | 멤버십 테이블 |
+| PG(토스) | `PaymentGateway` 인터페이스(`ImageStorageService` Local/S3 분기 패턴, mock부터) | 설계만(코드 0) | — |
+| 유료이미지 인증서빙 | `imageStorageService.urlFor` 승격 | 0단계는 잠기면 이미지 미반환이라 불필요 | — |
+
+**정직한 표현**: 호출부 시그니처·반환구조·컨트롤러 골격은 **0재작업**. 단 PAID 가격 노출은 `AccessResult`+DTO에 `price` 필드 **추가**(스키마 증분) — "구조 0재작업 + 데이터 증분". `preview_price`는 지금 안 깐다(YAGNI — 사용처 없는 컬럼=검증·문서·테스트 부채).
+**보류(0단계 밖)**: like/bookmark 잠금가드(저영향·제품결정), DB CHECK 제약(엔티티가 단일 쓰기경로라 충분), 무료전환 알림(필요 시 EpisodePublisher 스케줄러 병행).
+
 ### 3.4 수익 모델 열린 결정
 - 설정 단위: **작품 단위 기본** + (옵션) 회차 오버라이드.
 - 코인 vs 직접결제: **유료회차=코인 / 후원=직접결제** 분리 권장.

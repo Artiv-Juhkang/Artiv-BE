@@ -1100,6 +1100,27 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 28 — 수익화 0단계: 작가 공개정책 + 기다리면무료 (수익모델 척추) ✅ 완료 (커밋: `feat: STEP 28 ...`)
+
+> 결제 0으로 작가가 작품 단위 공개정책(전체무료/기다리면무료)을 설정하고, 회차 열람에 **엔타이틀먼트 가드 seam**을 끼움. **사용자 핵심요구=미래 결제·정산을 재작업 없이 얹는 설계.** 180테스트 + 라이브. 설계는 멀티에이전트 패널(코드검증 스펙), 검증은 적대적 리뷰.
+
+### 1) 기다리면무료 = compute-on-read (스케줄러 0)
+- 잠금을 상태로 저장하지 않고 **읽을 때 계산**: `freeAt = publishAt + waitFreeDays일`, `now >= freeAt`면 무료. 스케줄러·backfill·상태전이 0, 멱등. 설계 문서는 "스케줄러가 자동 전환"이라 했으나 패널이 compute-on-read로 단순화(상태 없음이 승). 정책 전환 시 과거 회차는 freeAt 이미 지나 **소급 안 잠김**(직관적·의도). EpisodeStatus는 불변(잠금≠상태).
+
+### 2) 엔타이틀먼트 가드 seam — 미래 재작업 0의 핵심
+- `EpisodeAccessEvaluator`(@Component) + `AccessResult(accessible, lockReason{NONE,WAIT}, freeAt)`. 0단계는 owner/FREE_ALL/시간계산만. **미래 주입점 ①**(waitLocked 반환 직전 한 자리)에 엔타이틀먼트·멤버십이 `if(...) return open()` 1줄로 끼움(viewerId·series 이미 파라미터). @Component라 미래 의존성주입 수용. `LockReason`은 2값만(PAID/MEMBERSHIP 미래=YAGNI). **정직한 표현: 구조 0재작업 + 데이터 증분**(PAID 가격 노출은 AccessResult/DTO에 price 필드 추가=스키마 증분). 확장점 전체 매핑은 [`docs/roadmap-and-monetization.md`] §3.6.
+
+### 3) 잠긴 회차 = 200 + locked (throw 아님)
+- 결정근거: `ErrorResponse(status,code,message,fieldErrors)`가 **freeAt 같은 임의필드를 못 실음** → 403/404 throw면 카운트다운 메타 전달 불가. 잠금은 "존재 은닉"이 아니라 "지연된 접근"이라 의미론도 200. **이미지 URL은 절대 비노출**(`/files` 정적서빙 URL 유추 차단) — locked 팩토리가 images=[], viewCount 미증가.
+
+### 4) 적대적 리뷰가 잡은 가드 비대칭 — markRead 잠금 우회
+- getDetail은 evaluate로 잠그는데 **markRead(읽음)는 `verifyInteractable`(visible·연령)만 거쳐 WAIT 락을 안 봄** → 못 본 잠긴 회차를 `POST /read`로 읽음 처리 가능 → `findMaxReadEpisodeNo`→lastReadNo 올라가 **UP 배지 꺼지고 서재에 안 본 작품 섞임**. 미래 PAID면 "안 사고 읽음"=정산 오염 seam 리스크. → markRead에 동일 evaluate(isPrivileged=isAuthoredBy) 추가, 잠기면 **no-op 스킵**(throw 아닌, 200+locked 설계와 일관). **교훈: 콘텐츠 가드는 읽기 한 곳이 아니라 모든 소비/상호작용 경로에 대칭으로.**
+
+### 5) 범위 균형 — 확장성 ≠ 과설계
+- 미래 끼울 "자리"는 명시하되 코인·엔타이틀먼트테이블·원장·PG·previewPrice 컬럼은 **안 만듦**(YAGNI — 사용처 없는 추상화/컬럼=검증·문서·테스트 부채). 플랫컬럼(Series에 @Embeddable 전례 0), 단위테스트는 `new EpisodeAccessEvaluator()` 직접 생성(0단계 무의존이라 정상).
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
