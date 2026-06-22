@@ -20,11 +20,15 @@
     refresh: localStorage.getItem('apptoon_refresh') || null,
     user: null,
     view: null,
+    unread: 0,
   };
+  let unreadTimer = null;
+  const NOTI_LABEL = { INQUIRY_ANSWERED: '문의 답변', EPISODE_PUBLISHED: '새 회차' };
 
   const app = document.getElementById('app');
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' }); } catch (_) { return ''; } };
 
   function setTokens(access, refresh) {
     state.token = access; state.refresh = refresh;
@@ -33,6 +37,8 @@
   }
   function clearTokens() {
     state.token = state.refresh = state.user = null;
+    state.unread = 0;
+    if (unreadTimer) { clearInterval(unreadTimer); unreadTimer = null; }
     localStorage.removeItem('apptoon_token');
     localStorage.removeItem('apptoon_refresh');
   }
@@ -184,6 +190,10 @@
             <span class="em">${esc(state.user.email)}</span><br>${roleStamp}
             <span class="cog" aria-hidden="true">⚙</span>
           </button>
+          <button class="side__bell" id="bell" aria-haspopup="dialog" title="알림">
+            <span class="bell__ico" aria-hidden="true">🔔</span> 알림
+            <span class="bell__badge" id="bellBadge" hidden>0</span>
+          </button>
           <nav class="nav">
             ${items.map(([k, label]) => `<button data-view="${k}" ${k === state.view ? 'aria-current="true"' : ''}>${label}</button>`).join('')}
           </nav>
@@ -195,6 +205,88 @@
       if (b) { state.view = b.dataset.view; route(); }
     });
     $('#account').addEventListener('click', openSettings);
+    $('#bell').addEventListener('click', openNotifications);
+    syncBellBadge();
+  }
+
+  // ---- 알림 벨 (폴링 배지 + 알림함 모달) ----
+  function syncBellBadge() {
+    const b = $('#bellBadge'); if (!b) return;
+    if (state.unread > 0) { b.textContent = state.unread > 99 ? '99+' : state.unread; b.hidden = false; }
+    else b.hidden = true;
+  }
+  async function refreshUnread() {
+    try { const r = await api('GET', '/api/me/notifications/unread-count'); state.unread = r.count; syncBellBadge(); }
+    catch (_) { /* 폴링 실패는 조용히 무시 */ }
+  }
+  function startUnreadPoll() {
+    refreshUnread();
+    if (unreadTimer) clearInterval(unreadTimer);
+    unreadTimer = setInterval(refreshUnread, 60000); // 60s 폴링
+  }
+
+  async function openNotifications() {
+    const m = document.createElement('div'); m.className = 'modal-bg';
+    m.innerHTML = `<div class="modal panel" role="dialog" aria-label="알림">
+      <div class="modal__hd"><h2>알림</h2><button class="btn btn--ghost btn--sm" id="noti-allread">모두 읽음</button></div>
+      <div class="seg seg--wrap" id="noti-tabs">
+        <button data-noti-type="" aria-current="true">전체</button>
+        ${Object.entries(NOTI_LABEL).map(([k, l]) => `<button data-noti-type="${k}">${l}</button>`).join('')}
+      </div>
+      <div id="noti-list" class="noti-list">${loading}</div>
+      <div class="modal__actions"><button class="btn btn--sm" data-x>닫기</button></div></div>`;
+    document.body.appendChild(m);
+    const dialog = m.querySelector('.modal'); dialog.setAttribute('tabindex', '-1'); dialog.focus();
+    const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+    function onKey(ev) { if (ev.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    let curType = '';
+    const loadList = async () => {
+      const box = $('#noti-list', m);
+      try {
+        const page = await api('GET', `/api/me/notifications${curType ? '?type=' + curType : ''}`);
+        box.innerHTML = page.content.length
+          ? page.content.map(notiRow).join('')
+          : '<div class="empty">알림이 없어요</div>';
+      } catch (e) { box.innerHTML = errBox(e); }
+    };
+    m.addEventListener('click', async (e) => {
+      if (e.target === m || e.target.closest('[data-x]')) return close();
+      const tab = e.target.closest('[data-noti-type]');
+      if (tab) {
+        m.querySelectorAll('#noti-tabs button').forEach((b) => b.removeAttribute('aria-current'));
+        tab.setAttribute('aria-current', 'true'); curType = tab.dataset.notiType; return loadList();
+      }
+      if (e.target.closest('#noti-allread')) {
+        try { await api('PATCH', '/api/me/notifications/read-all'); await refreshUnread(); await loadList(); toast('모두 읽음 처리했어요', 'ok'); }
+        catch (err) { toast(errMsg(err), 'err'); }
+        return;
+      }
+      const row = e.target.closest('[data-noti-id]');
+      if (row) {
+        try {
+          const n = await api('PATCH', `/api/me/notifications/${row.dataset.notiId}/read`);
+          await refreshUnread(); close(); notiRoute(n); // 읽음 처리 + 라우팅
+        } catch (err) { toast(errMsg(err), 'err'); }
+      }
+    });
+    loadList();
+  }
+
+  function notiRow(n) {
+    return `<button class="noti-row ${n.read ? '' : 'noti-row--unread'}" data-noti-id="${n.id}">
+      <span class="noti-row__dot" aria-hidden="true"></span>
+      <span class="noti-row__body"><b>${esc(n.title)}</b><span class="noti-row__msg">${esc(n.message)}</span>
+        <span class="noti-row__meta">${esc(NOTI_LABEL[n.type] || n.type)} · ${fmtDate(n.createdAt)}</span></span></button>`;
+  }
+
+  /** 클릭 시 (targetType,targetId)로 콘솔 내 라우팅. 콘솔에 화면이 없으면 안내만. */
+  function notiRoute(n) {
+    if (n.targetType === 'INQUIRY') {
+      state.view = state.user.role === 'ADMIN' ? 'admin-inquiries' : 'inquiries';
+      route(); return;
+    }
+    toast(`이동 대상: ${esc(n.targetType || '-')} #${n.targetId ?? '-'}`, 'ok');
   }
 
   // ---- 설정 모달 (계정 · 테마) ----
@@ -1119,7 +1211,7 @@
   // ====================================================================
   // 부트스트랩
   // ====================================================================
-  function boot() { route(); }
+  function boot() { route(); startUnreadPoll(); }
 
   async function init() {
     applyTheme();

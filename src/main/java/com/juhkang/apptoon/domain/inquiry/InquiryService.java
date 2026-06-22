@@ -13,6 +13,9 @@ import com.juhkang.apptoon.domain.inquiry.dto.InquiryAdminResponse;
 import com.juhkang.apptoon.domain.inquiry.dto.InquiryDetailResponse;
 import com.juhkang.apptoon.domain.inquiry.dto.InquiryImageResponse;
 import com.juhkang.apptoon.domain.inquiry.dto.InquiryResponse;
+import com.juhkang.apptoon.domain.notification.NotificationService;
+import com.juhkang.apptoon.domain.notification.NotificationTargetType;
+import com.juhkang.apptoon.domain.notification.NotificationType;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.global.dto.PageResponse;
@@ -35,6 +38,7 @@ public class InquiryService {
     private final InquiryImageRepository inquiryImageRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
     // ---- 사용자 ----
 
@@ -89,6 +93,11 @@ public class InquiryService {
     public InquiryAdminDetailResponse answer(Long inquiryId, String answer) {
         Inquiry inquiry = loadById(inquiryId);
         inquiry.answer(answer);
+        notificationService.fanOut(
+                List.of(inquiry.getUser().getId()),
+                NotificationType.INQUIRY_ANSWERED, NotificationTargetType.INQUIRY, inquiry.getId(),
+                null, "문의 답변 등록", "문의 '" + inquiry.getTitle() + "'에 답변이 등록됐어요.",
+                uid -> "INQ_ANS:" + inquiry.getId());
         return adminDetail(inquiry);
     }
 
