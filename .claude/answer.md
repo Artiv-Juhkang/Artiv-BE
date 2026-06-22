@@ -1012,6 +1012,31 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 24 — 인앱 알림 저장소 (Phase 3: 폴링·읽음·종류별·라우팅) ✅ 완료 (커밋: `feat: STEP 24 ...`)
+
+> 푸시로 끝나지 않고 **나중에 다시 보고, 읽음/안읽음 처리하고, 종류별로 분류하고, 클릭하면 어디로 갈지(라우팅) 정보를 주는** 인앱 알림 저장소. 외부 의존 0(폴링), 푸시(FCM)만 외부. 실서버 종단 검증(문의→답변→알림→읽음→라우팅) + 콘솔 벨 스크린샷. 144테스트.
+
+### 1) 폴리모픽 타겟 = 라우팅 신호
+- 알림은 `(targetType, targetId)`만 들고 있고(예: INQUIRY/3) 클라가 이걸로 딥링크. 비정규화 `title`/`message`로 목록 조회 시 조인 0. `recipientId`는 **비연관 Long**(대량 fan-out 프록시 비용 회피). → 신고/모더레이션의 폴리모픽 패턴을 알림에 재사용.
+
+### 2) "읽음 처리 + 라우팅 정보"를 한 호출로
+- 사용자 지적("확인 처리와 함께 라우팅"): `PATCH /{id}/read`가 읽음 표시 **후 NotificationResponse(targetType·targetId 포함) 반환** → 클라가 한 번에 "읽음+이동". 별도 조회 불필요.
+
+### 3) 종류별 분류 + 미읽음 집계
+- 모바일 "전체/[종류별]" 탭: `GET ?type=` 필터 + `GET /unread-summary`(`group by type` → `{total, byType:{INQUIRY_ANSWERED:1}}`)로 탭별 배지. `unread-count`는 폴링 배지용.
+
+### 4) fan-out 디커플링 — 발행 도메인은 알림을 모른다
+- `NotificationService.fanOut(recipientIds, type, targetType, targetId, actorId, title, message, dedupKeyFn)` 한 메서드. InquiryService.answer가 이것만 호출(단방향 의존, 순환 없음). Phase 4에서 회차/댓글/팔로우/멘션 트리거가 같은 메서드에 붙음. (이벤트 리스너/@Async 인프라는 Phase 4.)
+
+### 5) 멱등 dedup은 **수신자 단위** — 적대적 리뷰가 잡은 사일런트 드롭 함정
+- 14에이전트 리뷰가 한 결함으로 수렴: 전역 `unique(dedup_key)` + `existsByDedupKey`인데 fanOut 시그니처는 `Function<Long,String>`(수신자별 키). **다대상 fan-out 시 A의 알림 때문에 B가 자기 알림을 못 받는다.** Phase3는 단일 수신자라 안 터지지만 **지금 만드는 공유 프리미티브가 시그니처와 모순** → 복합 `unique(recipient_id, dedup_key)` + `existsByRecipientIdAndDedupKey`로 정정. **검증 에이전트는 "Phase4로 미뤄도 됨"이라 했지만, 추측성 유연성이 아니라 이미 약속된 계약과의 정합 수정이라 지금 고침.** (TOCTOU 500은 1인 단일관리자 기준 발생불가 → 보류, native upsert는 Phase4.)
+- **마이그레이션 이미 적용 후 수정**: V20가 dev DB에 적용된 뒤 인덱스 정정 → `drop table notifications; delete from flyway_schema_history where version='20'`로 **V20만 롤백**(전체 wipe 없이 시드 보존) 후 재적용. 적용된 마이그레이션 수정 = checksum 불일치(validate 실패) 주의.
+
+### 6) 적대적 리뷰의 메타 교훈
+- 리뷰 비평은 **명령이 아니라 입력** — "isReal=true지만 inScopeForPhase3=false"가 4건. 그중 dedup 정합은 내 판단으로 **승격해서 지금 수정**, TOCTOU는 가이드라인대로 **보류**. 비평을 그대로 따르지도, 무시하지도 않고 프로젝트 원칙(단순성·발생불가 예외처리 금지·사일런트 데이터손실 방지)으로 재정렬.
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)

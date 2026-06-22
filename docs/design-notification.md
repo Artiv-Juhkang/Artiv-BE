@@ -57,8 +57,8 @@ create table notifications (
 create index idx_notifications_recipient on notifications (recipient_id, created_at desc);
 -- 미읽음 개수(부분 인덱스)
 create index idx_notifications_unread on notifications (recipient_id) where read_at is null;
--- 멱등(있을 때만 유니크)
-create unique index uq_notifications_dedup on notifications (dedup_key) where dedup_key is not null;
+-- 멱등 — 수신자 단위(있을 때만 유니크). 전역이면 다대상 fan-out에서 교차 수신자 묵음(STEP 24 리뷰 반영).
+create unique index uq_notifications_dedup on notifications (recipient_id, dedup_key) where dedup_key is not null;
 ```
 
 ### 3.3 엔티티
