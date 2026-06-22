@@ -49,7 +49,7 @@ class AuthServiceTest {
 
     @Test
     void 회원가입은_생년월일을_저장한다() {
-        Long id = authService.signup(new SignupRequest("birth@b.com", "password123", "닉", LocalDate.of(2000, 3, 15), CONSENTS));
+        Long id = authService.signup(new SignupRequest("birth@b.com", "password123", "닉_svc", LocalDate.of(2000, 3, 15), CONSENTS));
 
         User user = userRepository.findById(id).orElseThrow();
         assertEquals(LocalDate.of(2000, 3, 15), user.getBirthDate());

@@ -35,8 +35,12 @@ public class UserService {
 
     @Transactional
     public MyProfileResponse changeNickname(Long userId, String nickname) {
+        String normalized = java.text.Normalizer.normalize(nickname, java.text.Normalizer.Form.NFC);  // 멘션 조회와 표현형 일치
         User user = load(userId);
-        user.changeNickname(nickname);
+        if (!user.getNickname().equals(normalized) && userRepository.existsByNickname(normalized)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+        user.changeNickname(normalized);
         return toProfile(user);
     }
 

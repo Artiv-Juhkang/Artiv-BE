@@ -23,7 +23,8 @@
     unread: 0,
   };
   let unreadTimer = null;
-  const NOTI_LABEL = { INQUIRY_ANSWERED: '문의 답변', EPISODE_PUBLISHED: '새 회차' };
+  const NOTI_LABEL = { INQUIRY_ANSWERED: '문의 답변', EPISODE_PUBLISHED: '새 회차',
+    POST_COMMENT: '새 댓글', COMMENT_REPLY: '새 답글', FOLLOWED: '새 팔로워', POST_MENTIONED: '멘션' };
 
   const app = document.getElementById('app');
   const $ = (s, r = document) => r.querySelector(s);

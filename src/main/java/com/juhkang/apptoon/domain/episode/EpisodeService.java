@@ -13,6 +13,10 @@ import org.springframework.web.multipart.MultipartFile;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeDetailResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeImageResponse;
 import com.juhkang.apptoon.domain.episode.dto.EpisodeSummaryResponse;
+import com.juhkang.apptoon.domain.notification.NotificationService;
+import com.juhkang.apptoon.domain.notification.NotificationTargetType;
+import com.juhkang.apptoon.domain.notification.NotificationType;
+import com.juhkang.apptoon.domain.personalization.SubscriptionRepository;
 import com.juhkang.apptoon.domain.series.AgeRating;
 import com.juhkang.apptoon.domain.series.Series;
 import com.juhkang.apptoon.domain.series.SeriesAccessChecker;
@@ -38,6 +42,8 @@ public class EpisodeService {
     private final SeriesAccessChecker seriesAccessChecker;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final SubscriptionRepository subscriptionRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public int upload(Long userId, Long seriesId, String title, Instant publishAt, List<MultipartFile> images) {
@@ -61,13 +67,30 @@ public class EpisodeService {
             ImageStorageService.Stored s = stored.get(order);
             episodeImageRepository.save(EpisodeImage.create(episode, order, s.path(), s.width(), s.height()));
         }
+        if (!scheduled) {                       // 즉시 발행 → 구독자에게 알림(예약은 발행 시점에)
+            notifySubscribers(series, episode);
+        }
         return episodeNo;
     }
 
     @Transactional
     public void publishDueEpisodes(Instant now) {
         episodeRepository.findByStatusAndPublishAtLessThanEqual(EpisodeStatus.SCHEDULED, now)
-                .forEach(Episode::markPublished);
+                .forEach(ep -> {
+                    ep.markPublished();
+                    notifySubscribers(ep.getSeries(), ep);   // SCHEDULED→PUBLISHED 전환 시 알림
+                });
+    }
+
+    /** 시리즈 구독자에게 새 회차 알림(작가 본인 제외). dedup_key=회차 PK라 발행 경로 중복돼도 멱등. */
+    private void notifySubscribers(Series series, Episode episode) {
+        Long authorId = series.getAuthor().getId();
+        List<Long> recipients = subscriptionRepository.findSubscriberIdsBySeriesId(series.getId()).stream()
+                .filter(id -> !id.equals(authorId)).toList();
+        notificationService.fanOut(recipients, NotificationType.EPISODE_PUBLISHED, NotificationTargetType.EPISODE,
+                episode.getId(), null, "새 회차",
+                "구독작 '" + series.getTitle() + "' " + episode.getEpisodeNo() + "화가 올라왔어요.",
+                rid -> "EP_PUB:" + episode.getId());
     }
 
     public SliceResponse<EpisodeSummaryResponse> getEpisodes(Long seriesId, Long viewerId, boolean isAdmin,

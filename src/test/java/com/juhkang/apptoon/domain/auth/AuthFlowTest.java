@@ -66,6 +66,15 @@ class AuthFlowTest {
     }
 
     @Test
+    void 공백_포함_닉네임_가입은_400() throws Exception {  // 멘션 불가 닉네임 차단(멘션 문자셋과 일치)
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"space@test.com\",\"password\":\"password123\",\"nickname\":\"공백 닉\","
+                                + "\"birthDate\":\"2000-01-01\",\"consents\":{\"TERMS_OF_SERVICE\":true,\"PRIVACY_POLICY\":true}}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 잘못된_토큰은_401() throws Exception {
         mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer garbage.token.value"))
                 .andExpect(status().isUnauthorized());
@@ -73,7 +82,7 @@ class AuthFlowTest {
 
     @Test
     void 틀린_비밀번호_로그인은_INVALID_CREDENTIALS_401() throws Exception {
-        signup("wrong@test.com", "password123", "닉");
+        signup("wrong@test.com", "password123", "닉_flow");
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

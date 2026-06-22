@@ -7,6 +7,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.juhkang.apptoon.domain.follow.dto.FollowStatsResponse;
 import com.juhkang.apptoon.domain.follow.dto.FollowUserResponse;
+import com.juhkang.apptoon.domain.notification.NotificationService;
+import com.juhkang.apptoon.domain.notification.NotificationTargetType;
+import com.juhkang.apptoon.domain.notification.NotificationType;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.global.exception.BusinessException;
@@ -23,6 +26,7 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
     @Transactional
     public void follow(Long followerId, Long targetId) {
@@ -33,9 +37,12 @@ public class FollowService {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
         if (followRepository.existsByFollowerIdAndFollowingId(followerId, targetId)) {
-            return; // 멱등
+            return; // 멱등 — 재팔로우는 알림 없음
         }
         followRepository.save(Follow.create(followerId, targetId));
+        notificationService.fanOut(List.of(targetId), NotificationType.FOLLOWED, NotificationTargetType.USER,
+                followerId, followerId, "새 팔로워", "회원님을 팔로우하기 시작했어요.",
+                rid -> "FOLLOW:" + followerId);
     }
 
     @Transactional

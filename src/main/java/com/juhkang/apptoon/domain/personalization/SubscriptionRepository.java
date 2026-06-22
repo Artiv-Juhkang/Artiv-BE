@@ -14,4 +14,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     @Query("select s from Subscription s join fetch s.series where s.user.id = :userId order by s.id desc")
     List<Subscription> findByUserIdWithSeries(@Param("userId") Long userId);
+
+    @Query("select s.user.id from Subscription s where s.series.id = :seriesId")
+    List<Long> findSubscriberIdsBySeriesId(@Param("seriesId") Long seriesId);
 }

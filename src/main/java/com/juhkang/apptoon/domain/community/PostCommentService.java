@@ -2,12 +2,16 @@ package com.juhkang.apptoon.domain.community;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.juhkang.apptoon.domain.community.dto.PostCommentResponse;
+import com.juhkang.apptoon.domain.notification.NotificationService;
+import com.juhkang.apptoon.domain.notification.NotificationTargetType;
+import com.juhkang.apptoon.domain.notification.NotificationType;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.global.exception.BusinessException;
@@ -23,6 +27,7 @@ public class PostCommentService {
     private final PostCommentRepository postCommentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public PostCommentResponse write(Long userId, Long postId, String content, Long parentId) {
@@ -31,9 +36,37 @@ public class PostCommentService {
         if (post.isBlinded()) {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
         }
-        Long effectiveParent = resolveParent(postId, parentId);
+        ParentRef parent = resolveParent(postId, parentId);
+        Long effectiveParent = parent == null ? null : parent.effectiveParentId();
         PostComment saved = postCommentRepository.save(PostComment.create(postId, userId, effectiveParent, content));
+
+        if (parent == null) {                                  // ① 최상위 댓글 → 글 작성자
+            if (!post.getAuthorId().equals(userId)) {
+                notificationService.fanOut(List.of(post.getAuthorId()), NotificationType.POST_COMMENT,
+                        NotificationTargetType.POST, postId, userId, "새 댓글",
+                        "회원님의 글 '" + post.getTitle() + "'에 새 댓글이 달렸어요.",
+                        rid -> "POST_CMT:" + saved.getId());
+            }
+        } else if (!parent.parentAuthorId().equals(userId)) {  // ② 대댓글 → 부모 댓글 작성자
+            notificationService.fanOut(List.of(parent.parentAuthorId()), NotificationType.COMMENT_REPLY,
+                    NotificationTargetType.COMMENT, parent.effectiveParentId(), userId, "새 답글",
+                    "회원님의 댓글에 답글이 달렸어요.", rid -> "CMT_REPLY:" + saved.getId());
+        }
+        notifyMentions(content, userId, postId, saved.getId());  // ④ 댓글 본문 멘션
         return new PostCommentResponse(saved.getId(), nickname(userId), saved.getContent(), saved.getCreatedAt(), List.of());
+    }
+
+    /** 댓글 본문 @닉네임 → 언급된 사용자에게 POST_MENTIONED(작성자 본인 제외). */
+    private void notifyMentions(String content, Long actorId, Long postId, Long commentId) {
+        Set<String> nicks = Mentions.extract(content);
+        if (nicks.isEmpty()) {
+            return;
+        }
+        List<Long> recipients = userRepository.findByNicknameIn(nicks).stream()
+                .map(User::getId).filter(id -> !id.equals(actorId)).toList();
+        notificationService.fanOut(recipients, NotificationType.POST_MENTIONED, NotificationTargetType.POST,
+                postId, actorId, "멘션 알림", "회원님이 댓글에서 언급됐어요.",
+                rid -> "CMT_MENTION:" + commentId + ":" + rid);
     }
 
     public List<PostCommentResponse> getComments(Long postId) {
@@ -59,8 +92,12 @@ public class PostCommentService {
         postCommentRepository.delete(comment); // FK cascade로 대댓글도 정리
     }
 
-    /** 1-depth 강제: 대댓글에 대댓글이면 최상위 부모로 평탄화. */
-    private Long resolveParent(Long postId, Long parentId) {
+    /** 평탄화된 부모 댓글 식별(1-depth 강제) + 그 작성자 id(대댓글 알림 수신자). */
+    private record ParentRef(Long effectiveParentId, Long parentAuthorId) {
+    }
+
+    /** 1-depth 강제: 대댓글에 대댓글이면 최상위 부모로 평탄화. 최상위 부모의 작성자도 함께 반환. */
+    private ParentRef resolveParent(Long postId, Long parentId) {
         if (parentId == null) {
             return null;
         }
@@ -69,7 +106,12 @@ public class PostCommentService {
         if (!parent.getPostId().equals(postId)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
-        return parent.isReply() ? parent.getParentId() : parent.getId();
+        if (parent.isReply()) {     // 대댓글에 단 답글 → 최상위 부모로 평탄화
+            PostComment top = postCommentRepository.findById(parent.getParentId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+            return new ParentRef(top.getId(), top.getAuthorId());
+        }
+        return new ParentRef(parent.getId(), parent.getAuthorId());
     }
 
     private PostCommentResponse toResponse(PostComment c, Map<Long, String> names, List<PostComment> replies) {

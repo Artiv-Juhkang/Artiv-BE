@@ -1,6 +1,7 @@
 package com.juhkang.apptoon.domain.auth;
 
 import java.security.SecureRandom;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Base64;
@@ -45,10 +46,14 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
         }
+        String nickname = Normalizer.normalize(request.nickname(), Normalizer.Form.NFC);  // 멘션 조회와 표현형 일치
+        if (userRepository.existsByNickname(nickname)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
         User user = User.create(
                 request.email(),
                 passwordEncoder.encode(request.password()),
-                request.nickname(),
+                nickname,
                 Role.READER,
                 request.birthDate()
         );

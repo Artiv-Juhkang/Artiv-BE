@@ -2,6 +2,7 @@ package com.juhkang.apptoon.domain.community;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -17,6 +18,9 @@ import com.juhkang.apptoon.domain.community.dto.PostAdminResponse;
 import com.juhkang.apptoon.domain.community.dto.PostDetailResponse;
 import com.juhkang.apptoon.domain.community.dto.PostImageResponse;
 import com.juhkang.apptoon.domain.community.dto.PostResponse;
+import com.juhkang.apptoon.domain.notification.NotificationService;
+import com.juhkang.apptoon.domain.notification.NotificationTargetType;
+import com.juhkang.apptoon.domain.notification.NotificationType;
 import com.juhkang.apptoon.domain.user.User;
 import com.juhkang.apptoon.domain.user.UserRepository;
 import com.juhkang.apptoon.global.dto.PageResponse;
@@ -38,6 +42,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
     @Transactional
     public Long create(Long authorId, PostCategory category, String title, String content, List<MultipartFile> images) {
@@ -55,7 +60,21 @@ public class PostService {
                 postImageRepository.save(PostImage.create(post.getId(), i, s.path(), s.width(), s.height()));
             }
         }
+        notifyMentions(content.strip(), authorId, post.getId(),
+                "회원님이 게시글 '" + post.getTitle() + "'에서 언급됐어요.", "POST_MENTION:" + post.getId());
         return post.getId();
+    }
+
+    /** 본문 @닉네임 → 언급된 사용자에게 POST_MENTIONED(작성자 본인 제외). dedupBase는 (글/댓글) 고유 prefix. */
+    private void notifyMentions(String content, Long actorId, Long postId, String message, String dedupBase) {
+        Set<String> nicks = Mentions.extract(content);
+        if (nicks.isEmpty()) {
+            return;
+        }
+        List<Long> recipients = userRepository.findByNicknameIn(nicks).stream()
+                .map(User::getId).filter(id -> !id.equals(actorId)).toList();
+        notificationService.fanOut(recipients, NotificationType.POST_MENTIONED, NotificationTargetType.POST,
+                postId, actorId, "멘션 알림", message, rid -> dedupBase + ":" + rid);
     }
 
     public PageResponse<PostResponse> getList(PostCategory category, PostSort sort, Pageable pageable) {
