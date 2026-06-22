@@ -1084,6 +1084,22 @@ docker compose down -v                # 볼륨까지 삭제 = DB 데이터 완�
 
 ---
 
+## STEP 27 — 작가 소식 피드 (Phase 6: Follow⨝Post 재사용) ✅ 완료 (커밋: `feat: STEP 27 ...`)
+
+> 팔로우한 사용자들의 공개 글을 최신순 피드로 + 작가별 공개 글. **새 테이블·새 엔티티 0** — Follow(STEP21)+Post(STEP22)+PostResponse+닉네임배치+`Pageables.pageOnly`(STEP26) 전부 재사용. 166테스트 + 라이브 검증. ultracode 아님 → 워크플로 없이 TDD 직접.
+
+### 1) 피드 = 서브쿼리 한 방
+- `GET /api/me/author-news-feed`: `select p from Post p where p.blinded=false and p.authorId in (select f.followingId from Follow f where f.followerId=:userId) order by p.id desc`. 팔로우 ids를 따로 안 뽑고 JPQL 서브쿼리로 1쿼리. 블라인드 제외(타인 콘텐츠). 닉네임만 배치(N+1 없음).
+- `GET /api/authors/{id}/posts`: 작가 공개 프로필용 — `findByAuthorIdAndBlindedFalseOrderByIdDesc`(파생쿼리). 내 글(`/api/me/posts`, 블라인드 포함)과 대비 — **공개 뷰는 블라인드 제외**.
+
+### 2) 직전 단계 패턴 그대로 흡수(연관성)
+- 고정정렬이라 STEP26의 `Pageables.pageOnly`로 클라 sort 무시(라이브에서 `?sort=garbage`→200 확인). `PostResponse` 재사용, `toPostResponses(Page<Post>)` 헬퍼로 닉네임 배치 매핑(getList와 중복 최소화하되 getList는 PostSort 정렬이라 별도 유지=정밀수정).
+
+### 3) 도메인 배치
+- 피드는 me-스코프라 `MyActivityController`(/api/me)에, 작가 공개글은 `AuthorController`(/api/authors) 신설. 커뮤니티 전체가 인증 게이트(`anyRequest().authenticated()`)라 둘 다 로그인 필요(일관성, SecurityConfig 무변경).
+
+---
+
 ## 부록 A. 자주 쓰는 명령어
 ```bash
 docker compose up -d                 # DB 컨테이너 기동(백그라운드)
