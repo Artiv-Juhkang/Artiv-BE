@@ -1,29 +1,22 @@
 # AppToon 백엔드 — 프론트엔드 협업 가이드
 
-React Native(Expo) 프론트가 이 백엔드와 연동하는 데 필요한 모든 것. 서버 실행 → 인증 → 공통 규약 → 엔드포인트 → 타입 생성 순.
+React Native(Expo) 프론트가 이 백엔드와 연동하는 데 필요한 것: 서버 실행 → 인증 → 공통 규약 → 도메인 맵 → 타입 생성.
 
 > 스택: Java 25 · Spring Boot 4.1 · PostgreSQL 16 · JWT 인증 · springdoc(OpenAPI). 기본 포트 **8080**.
+>
+> **이 문서는 온보딩 + 공통 규약 + 도메인 지도**다. **엔드포인트 전수·요청/응답 DTO 스키마의 단일 출처는 Swagger**(아래 §5):
+> `http://localhost:8080/swagger-ui/index.html` · `docs/openapi.json`(추출본). 코드와 항상 동기화되니 개별 엔드포인트는 거기서 확인한다.
 
 ---
 
 ## 1. 서버 실행 (Quick Start)
 
 ```bash
-# 1) DB 컨테이너 기동 (Docker Desktop 실행 중이어야 함)
-docker compose up -d                 # postgres:16, localhost:5432, healthcheck 내장
-
-# 2) 환경변수 준비
-cp .env.example .env                 # 그리고 JWT_SECRET 채우기
-#   JWT_SECRET 은 32바이트 이상 임의 문자열: openssl rand -base64 48
-
-# 3) 서버 실행
+docker compose up -d                 # postgres:16, localhost:5432
+cp .env.example .env                 # JWT_SECRET 채우기 (openssl rand -base64 48)
 ./gradlew bootRun                    # http://localhost:8080
-
-# 4) 살아있는지 확인 (인증 불필요)
-curl http://localhost:8080/api/health      # -> {"status":"ok"}
+curl http://localhost:8080/api/health      # -> {"status":"ok"} (인증 불필요)
 ```
-
-필요 환경변수(.env 또는 IntelliJ Run Config):
 
 | 변수 | 기본/예시 | 설명 |
 |---|---|---|
@@ -31,8 +24,8 @@ curl http://localhost:8080/api/health      # -> {"status":"ok"}
 | `DB_USER` / `DB_PASSWORD` | `apptoon` / `devpass` | 〃 |
 | `JWT_SECRET` | (직접 생성) | HS256 서명키, 32바이트+ |
 
-- 스키마는 **Flyway가 자동 적용**(서버 기동 시 V1~V12). 별도 SQL 실행 불필요.
-- 업로드 이미지는 로컬 `storage/`에 저장되고 `/files/**`로 서빙된다(아래 5.3).
+- 스키마는 **Flyway가 자동 적용**(서버 기동 시 V1~V22). 별도 SQL 실행 불필요.
+- 업로드 이미지는 로컬 `storage/`에 저장되고 `/files/**`로 공개 서빙(§3.4).
 
 ---
 
@@ -41,156 +34,118 @@ curl http://localhost:8080/api/health      # -> {"status":"ok"}
 흐름: **회원가입 → 로그인(토큰 발급) → 보호 API 호출(Bearer) → 만료 시 refresh**.
 
 ```
-POST /api/auth/signup   {email, password, nickname, birthDate}  -> 201 {id}
-POST /api/auth/login    {email, password}                       -> {accessToken, refreshToken}
-POST /api/auth/refresh  {refreshToken}                          -> {accessToken, refreshToken}  (회전: 기존 refresh 폐기)
+POST /api/auth/signup   {email, password, nickname, birthDate, consents{...}}  -> 201 {id}
+POST /api/auth/login    {email, password}                                      -> {accessToken, refreshToken}
+POST /api/auth/refresh  {refreshToken}                                         -> {accessToken, refreshToken}  (회전)
 ```
 
-- 보호 API는 헤더 `Authorization: Bearer <accessToken>` 필요.
-- **accessToken 유효 1시간**, **refreshToken 14일**. accessToken 만료(401) 시 refresh로 새 쌍을 받고 재시도.
-- `refresh`는 **회전(rotation)** — 호출 시 새 쌍 발급 + 기존 refresh 즉시 폐기(재사용하면 401). refreshToken은 최신 것만 안전 보관(예: Expo SecureStore).
-- 비로그인/잘못된 토큰 = **401**, 로그인했지만 권한 부족 = **403**. 둘 다 아래 표준 에러 JSON(2.1과 동일 형식).
-
-`birthDate`(생년월일)는 **필수**(`YYYY-MM-DD`, 과거 날짜) — 19금 작품 열람 게이트(만 19세)에 쓰인다.
-
-권한 역할: `READER`(독자) / `CREATOR`(작가) / `ADMIN`(관리자). 가입 시 기본 READER, 작가 전환은 관리자가.
+- 보호 API는 헤더 `Authorization: Bearer <accessToken>`. **거의 모든 API가 인증 필요**(`/api/auth/**`·`/api/health`·`/files/**`·Swagger만 공개).
+- **accessToken 1시간 / refreshToken 14일**. 401 시 refresh로 새 쌍 받고 재시도.
+- `refresh`는 **회전(rotation)** — 새 쌍 발급 + 기존 refresh 즉시 폐기(재사용 401). 최신 refresh만 보관(Expo SecureStore).
+- **가입 입력 규칙**(가입 화면이 강제할 것):
+  - `birthDate` 필수(`YYYY-MM-DD`, 과거). **만 14세 미만 가입 차단**, 19금 작품은 만 19세 게이트.
+  - `nickname` **유일**(중복 시 `DUPLICATE_NICKNAME` 409) + **한글·영문·숫자·`_`만**(공백·특수문자 불가 → 400). 멘션 `@닉네임`이 1명을 정확히 가리키게 하기 위함.
+  - `consents` 맵 — 필수 동의(`TERMS_OF_SERVICE`,`PRIVACY_POLICY`) 미동의 시 가입 거부. 선택: `MARKETING_EMAIL`(기본 opt-out) 등. 동의 종류는 Swagger의 `ConsentType` 참조.
+- 역할: `READER`(독자) / `CREATOR`(작가) / `ADMIN`(관리자). 가입 시 READER, 작가 전환은 `POST /api/users/me/creator-request` 신청 → 관리자 승인.
 
 ---
 
 ## 3. 공통 규약 (Contracts)
 
 ### 3.1 Base URL
-- 개발: `http://localhost:8080`
-- 실기기(Expo Go)에서 `localhost`는 **폰 자신**을 가리킨다 → PC의 LAN IP 사용(예: `http://192.168.0.10:8080`). `adb reverse tcp:8080 tcp:8080`(안드로이드) 도 가능.
+- 개발: `http://localhost:8080`. 실기기(Expo Go)는 `localhost`가 폰 자신이라 **PC의 LAN IP**(`http://192.168.0.10:8080`) 또는 `adb reverse tcp:8080 tcp:8080`.
 
-### 3.2 페이징
-두 종류가 용도별로 다르다.
+### 3.2 페이징 — Page vs Slice
+**Page**(전체 개수 필요 — 목록·댓글·내 활동): `?page=0&size=20`
+```json
+{ "content": [...], "page":0, "size":20, "totalElements":57, "totalPages":3, "last":false }
+```
+**Slice**(무한스크롤 — 회차 목록): `{ "content":[...], "page":0, "size":20, "hasNext":true }`
 
-**Page**(전체 개수 필요 — 작품 목록, 댓글): 요청 `?page=0&size=20&sort=...`
-```json
-{ "content": [...], "page": 0, "size": 20, "totalElements": 57, "totalPages": 3, "last": false }
-```
-**Slice**(무한스크롤 — 회차 목록): 전체 개수 없이 `hasNext`만
-```json
-{ "content": [...], "page": 0, "size": 20, "hasNext": true }
-```
-다음 페이지 판단: Page는 `!last`, Slice는 `hasNext`.
+다음 페이지: Page는 `!last`, Slice는 `hasNext`.
+> ⚠️ **고정 정렬 목록**(회차·내 글·내 댓글·추천·열람이력·소식피드 등)은 서버 정렬이 고정이라 **`?sort=`를 보내지 말 것**(무시됨). 관리자/탐색 목록 등 정렬 지원 여부는 Swagger 파라미터로 확인.
 
 ### 3.3 에러 (모든 에러 공통 형식)
 ```json
-{ "status": 400, "code": "INVALID_INPUT", "message": "입력값이 올바르지 않습니다.",
-  "fieldErrors": [ { "field": "email", "reason": "이메일 형식이 아닙니다" } ] }
+{ "status":400, "code":"INVALID_INPUT", "message":"입력값이 올바르지 않습니다.",
+  "fieldErrors":[ {"field":"email","reason":"이메일 형식이 아닙니다"} ] }
 ```
-- `code`(머신용)로 분기, `message`(한국어)는 그대로 표시 가능, `fieldErrors`는 검증 실패 시에만 채워짐.
-- 주요 code: `INVALID_INPUT`(400) · `ENTITY_NOT_FOUND`(404) · `DUPLICATE_EMAIL`(409) · `INVALID_CREDENTIALS`(401) · `UNAUTHORIZED`(401) · `FORBIDDEN`(403) · `ADULT_ONLY`(403) · `INVALID_IMAGE`(400).
-- **성공 응답은 envelope 없이 DTO를 그대로** 반환(에러만 위 형식).
+- `code`로 분기, `message`(한국어) 표시 가능, `fieldErrors`는 검증 실패 시만.
+- 주요 code: `INVALID_INPUT`(400) · `ENTITY_NOT_FOUND`(404) · `DUPLICATE_EMAIL`/`DUPLICATE_NICKNAME`(409) · `INVALID_CREDENTIALS`/`UNAUTHORIZED`/`INVALID_TOKEN`(401) · `FORBIDDEN`/`ADULT_ONLY`(403) · `INVALID_IMAGE`(400).
+- **성공 응답은 envelope 없이 DTO 그대로**(에러만 위 형식).
 
 ### 3.4 이미지 URL
-회차 상세의 `images[].url`은 **앱 루트 상대경로**(`/files/1/3/0.png`). 프론트는 base URL을 붙여 사용:
-```
-<img src={`${BASE_URL}${image.url}`} />   // http://localhost:8080/files/1/3/0.png
-```
-`/files/**`는 **인증 없이** 접근 가능(공개 정적 서빙).
+회차/게시글 이미지의 `url`은 **앱 루트 상대경로**(`/files/1/3/0.png`). 프론트가 base URL을 붙인다: `${BASE_URL}${image.url}`. `/files/**`는 **인증 없이** 접근(공개 정적 서빙).
 
-### 3.5 enum / 날짜 형식
-- enum은 **문자열 그대로** 직렬화. `AgeRating`: `ALL|AGE_12|AGE_15|AGE_19` · `SeriesStatus`: `ONGOING|COMPLETED|HIATUS` · `EpisodeStatus`: `DRAFT|SCHEDULED|PUBLISHED` · `Role`: `READER|CREATOR|ADMIN` · `SeriesSort`: `LATEST|ADULT_FIRST`.
-- 날짜시간(`publishAt`, `createdAt`)은 **Instant = ISO-8601 UTC**(`2026-06-19T12:00:00Z`). `birthDate`는 `LocalDate`(`1990-01-01`).
-- 요일(`publishDays`)은 `DayOfWeek` 대문자 영어(`MONDAY`...`SUNDAY`).
+### 3.5 enum / 날짜
+- enum은 **문자열 그대로**. 자주 쓰는 값(전체는 Swagger 스키마):
+  - `AgeRating`: `ALL|AGE_12|AGE_15|AGE_19` · `SeriesStatus`: `ONGOING|COMPLETED|HIATUS` · `EpisodeStatus`: `DRAFT|SCHEDULED|PUBLISHED`
+  - `Genre`: `ROMANCE|FANTASY|ACTION|DRAMA|DAILY|COMEDY|THRILLER|SPORTS|HORROR|ETC` · `SeriesSort`: `LATEST|ADULT_FIRST`
+  - `PostCategory`: `RECOMMEND|FREE|FANART|QUESTION` · `PostSort`: `LATEST|BEST`
+  - `NotificationType`: `EPISODE_PUBLISHED|INQUIRY_ANSWERED|POST_COMMENT|COMMENT_REPLY|FOLLOWED|POST_MENTIONED`
+  - `ReleasePolicy`: `FREE_ALL|WAIT_FREE` · `InquiryType`: `ACCOUNT|PAYMENT|CONTENT|CREATOR|BUG|ETC`
+- 날짜시간(`publishAt`,`createdAt`,`freeAt`)은 **Instant=ISO-8601 UTC**(`2026-06-24T12:00:00Z`). `birthDate`는 `LocalDate`(`1990-01-01`). 요일(`publishDays`)은 `DayOfWeek` 대문자(`MONDAY`…).
+
+### 3.6 회차 잠금 (수익화 0단계 — 기다리면무료)
+작가가 작품 공개정책을 `WAIT_FREE`로 두면 최신화는 일정 기간 잠긴다. **잠긴 회차는 에러가 아니라 200 + 락 플래그**로 온다:
+```json
+EpisodeDetail(잠김) { "locked":true, "lockReason":"WAIT", "freeAt":"2026-07-01T00:00:00Z",
+                      "images":[], "viewCount":0, ... }   // 이미지 없음, freeAt까지 카운트다운
+```
+- `locked=true`면 뷰어 대신 "기다리면무료 — `freeAt`에 무료 전환" UI를 띄운다. `lockReason=WAIT`(0단계). 회차 목록(`EpisodeSummary`)에도 `locked`·`freeAt`가 있어 잠긴 화에 자물쇠 배지를 그릴 수 있다.
+- 작가 본인·관리자는 항상 열림(프리뷰). 결제(코인·멤버십)는 추후 단계.
+
+### 3.7 알림 라우팅
+알림 목록 항목은 클릭 시 이동에 필요한 정보를 담는다: `{ type, targetType, targetId, title, message, read, createdAt }`. 프론트는 `(targetType,targetId)`로 라우팅(예: `INQUIRY`/42 → 문의 상세). **읽음 처리(`PATCH /{id}/read`)는 읽음+라우팅 정보를 한 번에 반환** → "읽음 처리 후 이동"을 1콜로. 미읽음 배지는 `/unread-count` 폴링, 종류별 탭은 `/unread-summary`.
 
 ---
 
-## 4. API 엔드포인트 인벤토리
+## 4. 도메인 지도 (엔드포인트 그룹)
 
-🔓=비로그인 가능, 🔒=인증 필요, 👤=작가(CREATOR), 🛡=관리자(ADMIN).
+각 그룹의 **개별 엔드포인트·파라미터·DTO는 Swagger**에서 확인(아래 §5). 권한: 🔒 인증 · 👤 작가(CREATOR) · 🛡 관리자(ADMIN).
 
-### 인증 / 사용자
-| | 메서드·경로 | 요청 | 응답 |
-|---|---|---|---|
-| 🔓 | `POST /api/auth/signup` | `{email, password(8~64), nickname(~20), birthDate}` | 201 `{id}` |
-| 🔓 | `POST /api/auth/login` | `{email, password}` | `{accessToken, refreshToken}` |
-| 🔓 | `POST /api/auth/refresh` | `{refreshToken}` | `{accessToken, refreshToken}` |
-| 🔒 | `GET /api/users/me` | — | `{id, email, nickname, role}` |
-| 🔓 | `GET /api/health` | — | `{status:"ok"}` |
-
-### 작품(Series)
-| | 메서드·경로 | 비고 |
+| 도메인 | 경로 prefix | 무엇 |
 |---|---|---|
-| 🔒 | `GET /api/series` | 목록. 쿼리: `day, ageRating, keyword, adultOnly, sort(LATEST\|ADULT_FIRST), page, size` → **Page**<SeriesSummary> |
-| 🔒 | `GET /api/series/mine` | 작가 자기 작품(비공개 포함) → List<SeriesSummary> |
-| 🔒 | `GET /api/series/{id}` | 상세 → SeriesDetail (비공개·미발행은 작가/ADMIN만, 그 외 404) |
-| 👤 | `POST /api/series` | `{title, description, ageRating, status, publishDays[], adultOnly}` → 201 `{id}` |
+| 인증 | `/api/auth/**` 🔓 | 가입·로그인·refresh |
+| 계정·프로필 | `/api/users/me/**` 🔒 | 내 정보·닉네임·비번·아바타·소개·동의내역·작가신청 |
+| 팔로우 | `/api/users/{id}/follow(-stats)`, `/api/users/me/follow(ing\|ers)` 🔒 | 팔로우/통계/목록 |
+| 작품 | `/api/series/**` 🔒(생성·정책은 👤) | 목록·상세·등록·장르태그·**공개정책(release-policy)** |
+| 회차·뷰어 | `/api/series/{id}/episodes/**` 🔒(업로드 👤) | 목록(Slice)·상세(조회수·19금·**잠금** §3.6)·업로드(multipart)·좋아요 |
+| 개인화 | `/api/series/{id}/subscription`·`/read`·`/bookmark` 🔒 | 구독·읽음·북마크(멱등) |
+| 독자 서재 | `/api/me/subscriptions`·`/bookmarks`·`/read-history` 🔒 | 구독·관심·열람이력 |
+| 회차 댓글 | `/api/series/{id}/episodes/{no}/comments` 🔒 | 회차 댓글 |
+| 커뮤니티 | `/api/posts/**` 🔒 | 게시판(말머리·이미지≤5·추천·댓글/대댓글·**@멘션**) |
+| 내 활동 | `/api/me/posts`·`/post-comments`·`/liked-posts`·`/author-news-feed` 🔒 | 내 글·댓글·추천·**작가 소식 피드**(팔로우한 작가 글) |
+| 작가 공개글 | `/api/authors/{id}/posts` 🔒 | 특정 작가의 공개 게시글 |
+| 알림 | `/api/me/notifications/**` 🔒 | 목록(종류필터)·미읽음수·집계·읽음(§3.7). 멘션은 `?type=POST_MENTIONED` |
+| 신고 | `/api/reports` 🔒 / `/api/admin/reports/**` 🛡 | 신고 접수 / 관리자 처리 |
+| 문의 | `/api/me/inquiries` 🔒 / `/api/admin/inquiries/**` 🛡 | 1:1 문의 / 관리자 답변 |
+| 관리자 | `/api/admin/**` 🛡 | 사용자·권한·작품(연령·공개·성인)·작가신청·신고·커뮤니티·문의 |
 
-### 회차(Episode)
-| | 메서드·경로 | 비고 |
-|---|---|---|
-| 🔒 | `GET /api/series/{seriesId}/episodes` | 발행 회차 무한스크롤 → **Slice**<EpisodeSummary> |
-| 🔒 | `GET /api/series/{seriesId}/episodes/{episodeNo}` | 상세 → EpisodeDetail. **호출 시 조회수 +1**. 19금은 만19세만 |
-| 👤 | `POST /api/series/{seriesId}/episodes` | **multipart/form-data**: `title`, `publishAt`(선택, 미래면 예약), `images`(파일 여러 장) → 201 `{episodeNo}` |
-| 🔒 | `POST /api/series/{seriesId}/episodes/{episodeNo}/like` | 좋아요(멱등) → 201 |
-| 🔒 | `DELETE /api/series/{seriesId}/episodes/{episodeNo}/like` | 좋아요 취소 → 204 |
-
-### 개인화 / 소셜
-| | 메서드·경로 | 비고 |
-|---|---|---|
-| 🔒 | `POST/DELETE /api/series/{seriesId}/subscription` | 구독/해지(멱등) → 201/204 |
-| 🔒 | `POST /api/series/{seriesId}/episodes/{episodeNo}/read` | 읽음 처리(멱등) → 201 |
-| 🔒 | `GET /api/me/subscriptions` | 내 구독(UP 배지·이어보기) → List<Subscription> |
-| 🔒 | `POST/DELETE /api/series/{seriesId}/episodes/{episodeNo}/bookmark` | 북마크/취소(멱등) → 201/204 |
-| 🔒 | `GET /api/me/bookmarks` | 내 북마크 → List<Bookmark> |
-| 🔒 | `POST /api/series/{seriesId}/episodes/{episodeNo}/comments` | `{content}` → 201 `{id}` |
-| 🔒 | `GET /api/series/{seriesId}/episodes/{episodeNo}/comments` | **Page**<Comment> (`page,size`) |
-| 🔒 | `DELETE /.../comments/{commentId}` | 본인·ADMIN만 → 204 |
-
-### 관리자(🛡 ADMIN 전용)
-| 메서드·경로 | 요청 |
-|---|---|
-| `PATCH /api/admin/users/{userId}/role` | `{role}` (작가 권한 부여 등) |
-| `PATCH /api/admin/series/{seriesId}/age-rating` | `{ageRating}` |
-| `PATCH /api/admin/series/{seriesId}/visibility` | `{visible}` (공개/비공개) |
-| `PATCH /api/admin/series/{seriesId}/adult-only` | `{adultOnly}` (성인 전용; AGE_19여야 함) |
-
-### 주요 응답 DTO 형태
-```
-SeriesSummary  { id, title, authorNickname, ageRating, status, visible, adultOnly }
-SeriesDetail   { id, title, description, authorNickname, ageRating, status, publishDays[],
-                 visible, adultOnly, createdAt, episodeCount, latestEpisodeNo, isSubscribed }
-EpisodeSummary { episodeNo, title, publishAt }
-EpisodeDetail  { episodeNo, title, status, publishAt,
-                 images[{sortOrder, url, width, height}], viewCount, likeCount, liked }
-Subscription   { seriesId, title, latestEpisodeNo, lastReadEpisodeNo, up }
-Bookmark       { seriesId, seriesTitle, episodeNo, episodeTitle, createdAt }
-Comment        { id, content, authorNickname, createdAt }
-User           { id, email, nickname, role }
-```
+> **멘션**: 게시글/댓글 본문에 `@닉네임`을 쓰면 그 사용자에게 `POST_MENTIONED` 알림이 간다. 닉네임은 유일·제한문자셋(§2)이라 1명을 정확히 가리킨다.
 
 ---
 
-## 5. 타입 자동생성 (OpenAPI / Swagger)
+## 5. 타입 자동생성 (OpenAPI / Swagger) — **엔드포인트·DTO의 단일 출처**
 
-서버가 코드에서 OpenAPI 문서를 자동 생성한다 — **수기 타입 작성 대신 자동생성** 권장.
+서버가 코드에서 OpenAPI를 자동 생성 → **수기 타입 대신 자동생성**.
 
-- Swagger UI(브라우저에서 직접 호출·탐색): `http://localhost:8080/swagger-ui/index.html`
-- OpenAPI JSON(타입 생성 입력): `http://localhost:8080/v3/api-docs`
-
+- **Swagger UI**(탐색·호출): `http://localhost:8080/swagger-ui/index.html` — 우상단 **Authorize**에 accessToken 넣으면 보호 API도 브라우저에서 호출.
+- **OpenAPI JSON**: `http://localhost:8080/v3/api-docs` (라이브) · `docs/openapi.json` (추출 스냅샷, 70경로).
 ```bash
-# 예: openapi-typescript 로 TS 타입 생성
-npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts
+npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts   # 또는 docs/openapi.json
 ```
-Swagger UI 우상단 **Authorize**에 accessToken을 넣으면 보호 API도 브라우저에서 바로 호출해볼 수 있다.
+스냅샷 갱신: `curl -s localhost:8080/v3/api-docs | python -m json.tool > docs/openapi.json`
 
 ---
 
 ## 6. ✅ CORS — 설정됨
-
-- **RN 네이티브**(Expo Go 앱/빌드)는 CORS 무관 — 그대로 호출 가능.
-- **Expo Web/브라우저**에서도 호출 가능하도록 CORS를 허용한다(`SecurityConfig`).
-- **개발 기본은 전체 origin 허용**(`app.cors.allowed-origins` 기본 `*`). **운영은 환경변수 `CORS_ALLOWED_ORIGINS`**(콤마 구분)로 좁힌다 — 예: `CORS_ALLOWED_ORIGINS=https://app.example.com`.
-- 허용 메서드: `GET,POST,PATCH,PUT,DELETE,OPTIONS` · 헤더: 전체 · `allowCredentials=false`(JWT는 Authorization 헤더라 쿠키 미사용).
-
----
+- **RN 네이티브**(Expo Go)는 CORS 무관. **Expo Web/브라우저**도 허용.
+- 개발 기본 전체 origin(`app.cors.allowed-origins`=`*`). 운영은 `CORS_ALLOWED_ORIGINS`(콤마)로 좁힘. 허용 메서드 `GET,POST,PATCH,PUT,DELETE,OPTIONS` · `allowCredentials=false`(JWT는 Authorization 헤더).
 
 ## 7. RN Expo 연동 팁
-- `Authorization: Bearer` 자동 첨부 + 401 시 refresh 후 재시도는 axios 인터셉터로 한 곳에 처리.
-- 토큰 저장은 `expo-secure-store`(refresh) / 메모리(access).
-- 회차 업로드는 `multipart/form-data` — RN `FormData`에 `images` 파트로 파일들, `title`/`publishAt`은 폼 필드.
-- 이미지 렌더는 `${BASE_URL}${image.url}`. 무한스크롤은 회차 목록의 `hasNext`로 다음 페이지 로드.
+- `Authorization: Bearer` 자동 첨부 + 401 시 refresh 후 재시도는 **axios 인터셉터 한 곳**에.
+- 토큰: `expo-secure-store`(refresh) / 메모리(access).
+- 회차 업로드는 `multipart/form-data`(`images` 파트 파일들 + `title`/`publishAt` 폼 필드). 게시글도 multipart(이미지≤5).
+- 이미지 렌더 `${BASE_URL}${image.url}`. 무한스크롤은 회차 `hasNext`.
+- **잠긴 회차**(§3.6): `locked` 분기로 뷰어 대신 카운트다운 UI. **알림 배지**(§3.7): `/unread-count` 주기 폴링.
