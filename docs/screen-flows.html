@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AppToon — 화면 플로우 Visual Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#16142A; --surface:#211E3C; --surface-2:#2A2750; --line:rgba(255,255,255,.08);
+  --text:#ECEAF6; --muted:#9D98C0; --amber:#FFB661; --amber-ink:#FFCB8E; --amber-soft:rgba(255,182,97,.13);
+  --amber-border:rgba(255,182,97,.42); --glow:rgba(255,182,97,.18); --ph:#322E58; --ph2:#3b376a;
+  --good:#6FE0A6; --warn:#E0533B; --blue:#7CA8FF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(1200px 600px at 80% -10%,rgba(255,182,97,.07),transparent 60%),var(--bg);
+  color:var(--text);font-family:Pretendard,"Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.5;}
+h1,h2,h3,.dsp{font-family:Sora,Pretendard,sans-serif;letter-spacing:-.02em}
+.wrap{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+/* sidebar */
+.side{position:sticky;top:0;height:100vh;overflow:auto;background:var(--surface);border-right:1px solid var(--line);padding:22px 16px}
+.brand{font-family:Sora;font-weight:800;font-size:21px}.brand b{color:var(--amber-ink)}
+.brandsub{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:2px 0 22px}
+.nav a{display:flex;gap:10px;align-items:center;padding:9px 11px;border-radius:10px;color:var(--muted);
+  text-decoration:none;font-size:13.5px;font-weight:600;cursor:pointer}
+.nav a:hover{background:var(--surface-2);color:var(--text)}
+.nav a.on{color:var(--text);background:linear-gradient(90deg,var(--amber-soft),transparent);box-shadow:inset 0 0 0 1px var(--amber-border)}
+.nav a .n{width:22px;height:22px;flex:none;display:grid;place-items:center;border-radius:7px;background:var(--surface-2);
+  font-size:11px;font-weight:800;color:var(--amber-ink)}
+.legend{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;font-size:11px;color:var(--muted)}
+.legend b{color:var(--text)} .legend div{margin:5px 0}
+/* main */
+.main{padding:34px clamp(18px,4vw,50px) 80px;max-width:1500px}
+.head h1{font-size:clamp(26px,4vw,40px);font-weight:800}
+.head p{color:var(--muted);max-width:760px;margin-top:10px;font-size:14.5px}
+.head .meta{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--amber-soft);
+  color:var(--amber-ink);border:1px solid var(--amber-border)}
+.tag.g{background:rgba(111,224,166,.12);color:var(--good);border-color:rgba(111,224,166,.4)}
+.tag.b{background:rgba(124,168,255,.12);color:var(--blue);border-color:rgba(124,168,255,.4)}
+/* flow section */
+.flow{margin-top:46px;scroll-margin-top:20px}
+.flow__hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px}
+.flow__no{font-family:Sora;font-weight:800;color:var(--amber-ink);font-size:15px}
+.flow__hd h2{font-size:23px;font-weight:700}
+.flow__hd p{color:var(--muted);font-size:13.5px;flex-basis:100%;margin-top:2px}
+.rail{display:flex;gap:0;align-items:flex-start;overflow-x:auto;padding:26px 4px 10px;scroll-snap-type:x proximity}
+.step{display:flex;align-items:flex-start}
+.cell{display:flex;flex-direction:column;align-items:center;gap:10px;scroll-snap-align:start}
+.arrow{align-self:center;color:var(--amber);font-size:26px;padding:0 10px;flex:none;margin-top:240px}
+.cap{font-size:11.5px;font-weight:700;color:var(--text);text-align:center;max-width:236px}
+.apis{display:flex;flex-direction:column;gap:4px;max-width:236px}
+.api{font-family:ui-monospace,Menlo,monospace;font-size:10.3px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line);border-radius:7px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.api b{color:var(--amber-ink);font-weight:700}
+.api.post b{color:var(--good)} .api.del b{color:var(--warn)} .api.patch b{color:var(--blue)}
+/* phone */
+.ph{width:236px;height:480px;border-radius:30px;background:#100E22;border:1px solid var(--line);
+  box-shadow:0 24px 50px -24px rgba(0,0,0,.8),0 0 0 6px #0c0a1c;padding:8px;position:relative}
+.scr{width:100%;height:100%;border-radius:23px;overflow:hidden;background:var(--bg);position:relative;display:flex;flex-direction:column}
+.notch{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:74px;height:16px;background:#100E22;border-radius:0 0 11px 11px;z-index:5}
+.sb{height:24px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:9px;color:var(--muted);flex:none}
+.ab{padding:9px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);flex:none}
+.ab .t{font-family:Sora;font-weight:700;font-size:13px}.ab .sp{margin-left:auto;display:flex;gap:7px;color:var(--muted);font-size:12px}
+.body{flex:1;overflow:hidden;padding:11px;display:flex;flex-direction:column;gap:9px;position:relative}
+.tabs{display:flex;gap:6px;flex:none}
+.chip{font-size:9.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.chip.on{background:var(--amber-soft);color:var(--amber-ink);box-shadow:inset 0 0 0 1px var(--amber-border)}
+.tb{margin-top:auto;flex:none;height:38px;border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;color:var(--muted);font-size:8.5px}
+.tb .it{display:flex;flex-direction:column;align-items:center;gap:3px}.tb .it.on{color:var(--amber-ink)}
+.tb .ic{width:16px;height:16px;border-radius:5px;background:var(--surface-2)}.tb .it.on .ic{background:var(--amber-soft);box-shadow:inset 0 0 0 1px var(--amber-border)}
+/* generic blocks */
+.bar{height:9px;border-radius:5px;background:var(--ph)}.bar.s{width:55%}.bar.xs{width:35%;height:7px}.bar.amber{background:linear-gradient(90deg,var(--amber),transparent 80%)}
+.img{border-radius:9px;background:linear-gradient(135deg,var(--ph2),var(--ph));position:relative;overflow:hidden}
+.img:after{content:"▣";position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.16);font-size:20px}
+.r{display:flex;gap:9px;align-items:center}
+.tn{width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg,var(--ph2),var(--ph));flex:none}
+.tn.rd{border-radius:50%}
+.col{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.btn{height:30px;border-radius:9px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:700;color:var(--text);border:1px solid var(--line)}
+.btn.acc{background:linear-gradient(180deg,#FFC178,#EE9F45);color:#2a1c08;border:none;box-shadow:0 6px 16px -6px var(--amber)}
+.pill{font-size:8.5px;font-weight:800;padding:2px 7px;border-radius:999px;align-self:flex-start}
+.pill.amber{background:var(--amber-soft);color:var(--amber-ink);border:1px solid var(--amber-border)}
+.pill.lock{background:rgba(224,83,59,.16);color:#FF9F8C;border:1px solid rgba(224,83,59,.4)}
+.pill.up{background:rgba(111,224,166,.16);color:var(--good);border:1px solid rgba(111,224,166,.4)}
+.pill.new{background:var(--warn);color:#fff}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px 1px var(--amber);flex:none}
+.title{font-size:12px;font-weight:700;font-family:Sora}
+.sub{font-size:9.5px;color:var(--muted)}
+.kv{font-size:9px;color:var(--muted)}
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px}
+.lockwrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;
+  background:repeating-linear-gradient(45deg,rgba(224,83,59,.05),rgba(224,83,59,.05) 10px,transparent 10px,transparent 20px)}
+.cd{font-family:Sora;font-weight:800;font-size:19px;color:var(--amber-ink)}
+.note{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--amber);
+  border-radius:8px;padding:7px 9px;max-width:236px;text-align:left}
+.foot{margin-top:60px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="side">
+    <div class="brand">App<b>Toon</b></div>
+    <div class="brandsub">Screen Flows</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="legend">
+      <div><b>읽는 법</b></div>
+      <div>📱 = 모바일 화면 (RN/Expo)</div>
+      <div><span style="color:var(--good)">POST</span>/<span style="color:var(--blue)">PATCH</span>/<span style="color:var(--warn)">DELETE</span>/<span style="color:var(--amber-ink)">GET</span> = 호출 API</div>
+      <div><span class="pill lock" style="display:inline-block">잠금</span> 기다리면무료 · <span class="pill up" style="display:inline-block">UP</span> 새 회차</div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="head">
+      <h1>AppToon — 화면 플로우</h1>
+      <p>백엔드에 구현된 기능(STEP 1~28)을 모바일 앱 화면 흐름으로 매핑한 비주얼 컴패니언. 각 화면 아래의 모노스페이스 배지가 그 화면이 호출하는 실제 API다. 디자인 시스템은 관리자 콘솔과 동일한 "작업실"(다크·앰버).</p>
+      <div class="meta">
+        <span class="tag">70 endpoints</span><span class="tag g">11 flows</span>
+        <span class="tag b">JWT 인증</span><span class="tag">기다리면무료</span><span class="tag">인앱 알림</span>
+      </div>
+    </div>
+    <div id="flows"></div>
+    <div class="foot">전수 API·스키마는 Swagger(<code>/swagger-ui/index.html</code>) · 공통 규약은 <code>docs/frontend-guide.md</code> · 기능 정책은 <code>docs/features.md</code>. 이 페이지는 화면 흐름 안내용 와이어프레임이며 최종 비주얼이 아니다.</div>
+  </main>
+</div>
+<script>
+const SB = `<div class="sb"><span>9:41</span><span>● ▼ ▮</span></div>`;
+const notch = `<div class="notch"></div>`;
+function tb(active){const items=[['홈','home'],['서재','lib'],['커뮤','com'],['알림','noti'],['MY','my']];
+  return `<div class="tb">`+items.map(([l,k])=>`<div class="it ${k===active?'on':''}"><div class="ic"></div>${l}</div>`).join('')+`</div>`;}
+function phone(inner){return `<div class="ph">${notch}<div class="scr">${SB}${inner}</div></div>`;}
+function cell(inner, cap, apis){return `<div class="cell">${phone(inner)}<div class="cap">${cap}</div><div class="apis">${(apis||[]).map(a=>{
+  const m=a.match(/^(GET|POST|PATCH|DELETE|PUT)/);const cls=m?({POST:'post',DELETE:'del',PATCH:'patch',PUT:'patch'})[m[1]]||'':'';
+  return `<div class="api ${cls}">`+a.replace(/^(GET|POST|PATCH|DELETE|PUT)/,'<b>$1</b>')+`</div>`;}).join('')}</div></div>`;}
+const arrow=`<div class="arrow">→</div>`;
+function rail(cells){return `<div class="rail">`+cells.map((c,i)=>`<div class="step">${c}${i<cells.length-1?arrow:''}</div>`).join('')+`</div>`;}
+
+const FLOWS=[
+{id:'auth',no:'01',ic:'🔑',name:'온보딩 · 인증',desc:'스플래시 → 로그인/회원가입(약관 동의·만14세·닉네임 유일) → 홈. 401이면 refresh 회전.',cells:[
+  cell(`<div class="ab"><div class="t">AppToon</div></div><div class="center"><div style="font-family:Sora;font-weight:800;font-size:22px">App<span style="color:var(--amber-ink)">Toon</span></div><div class="sub">웹툰을 올리고 읽고</div><div class="btn acc" style="width:150px">시작하기</div><div class="sub">이미 계정이 있어요</div></div>`,
+    '스플래시 / 진입',['GET /api/health']),
+  cell(`<div class="ab"><div class="t">로그인</div></div><div class="body"><div class="bar xs"></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">이메일</div><div class="bar xs"></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">비밀번호 ••••</div><div class="btn acc">로그인</div><div class="sub" style="text-align:center">회원가입 →</div></div>`,
+    '로그인',['POST /api/auth/login','POST /api/auth/refresh']),
+  cell(`<div class="ab"><div class="t">회원가입</div></div><div class="body" style="gap:7px"><div class="btn" style="justify-content:flex-start;color:var(--muted)">이메일</div><div class="btn" style="justify-content:flex-start;color:var(--muted)">비밀번호(8+)</div><div class="btn" style="justify-content:flex-start;color:var(--muted)">닉네임 <span style="margin-left:auto;color:var(--good);font-size:9px">사용가능</span></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">생년월일</div><div class="r" style="font-size:9.5px"><span class="dot" style="background:var(--good);box-shadow:none"></span>(필수) 이용약관·개인정보</div><div class="r" style="font-size:9.5px;color:var(--muted)"><span style="width:7px;height:7px;border-radius:50%;border:1px solid var(--muted)"></span>(선택) 마케팅 수신</div><div class="btn acc">가입</div></div>`,
+    '회원가입 + 약관 동의',['POST /api/auth/signup','· 닉네임 유일·한글/영문/_','· 만14세+ · consents 필수']),
+  cell(homeScreen(),'홈 진입',['GET /api/series','GET /api/users/me']),
+]},
+{id:'browse',no:'02',ic:'📚',name:'홈 · 작품 감상',desc:'홈(요일·장르 탐색) → 작품 상세(구독·회차수) → 회차 목록 → 뷰어(조회수·좋아요·댓글).',cells:[
+  cell(homeScreen(),'홈 — 요일·장르 탐색',['GET /api/series?day&genre&sort']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">작품 상세</div></div><div class="body" style="gap:8px"><div class="r"><div class="img" style="width:60px;height:78px"></div><div class="col"><div class="title">던전 리셋</div><div class="sub">김작가 · 판타지</div><div class="r" style="gap:5px"><span class="pill amber">연재중</span><span class="pill up">UP</span></div><div class="kv">구독 1.2만 · 24화</div></div></div><div class="bar xs"></div><div class="bar s"></div><div class="r"><div class="btn acc" style="flex:1">＋ 구독</div><div class="btn" style="flex:1">첫화부터</div></div><div class="title" style="font-size:11px;margin-top:3px">회차</div><div class="r"><div class="tn"></div><div class="col"><div class="bar xs"></div><div class="kv">24화 · 6/20</div></div><span class="pill up">UP</span></div></div>`,
+    '작품 상세 (1요청 완성)',['GET /api/series/{id}','POST /api/series/{id}/subscription']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">회차 목록</div></div><div class="body" style="gap:7px">${[['24화','6/20','up'],['23화','6/13',''],['22화','6/6',''],['21화','5/30','']].map(([n,d,b])=>`<div class="r"><div class="tn"></div><div class="col"><div class="bar xs"></div><div class="kv">${n} · ${d}</div></div>${b==='up'?'<span class="pill up">UP</span>':''}</div>`).join('')}<div class="sub" style="text-align:center;margin-top:auto">∞ 무한 스크롤</div></div>`,
+    '회차 목록 (Slice·hasNext)',['GET .../episodes','→ Slice<EpisodeSummary>']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">24화</div><div class="sp">♡ ⤴</div></div><div class="body" style="gap:5px;padding:6px"><div class="img" style="height:120px"></div><div class="img" style="height:120px"></div><div class="img" style="height:80px"></div><div class="r" style="margin-top:auto;font-size:9.5px"><span style="color:var(--amber-ink)">♥ 3.2천</span><span style="margin-left:auto">💬 120</span><span style="margin-left:8px">👁 4.1만</span></div></div>`,
+    '뷰어 — 조회수+1·좋아요·댓글',['GET .../episodes/{no}','POST .../like','POST .../comments']),
+]},
+{id:'wait',no:'03',ic:'🔒',name:'기다리면무료 (수익화 0단계)',desc:'작가가 공개정책을 WAIT_FREE로 두면 최신화는 시간 잠금. 잠긴 회차는 에러가 아니라 200+locked(freeAt 카운트다운). 결제 없이 기다리면 무료 전환.',cells:[
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">회차 목록</div></div><div class="body" style="gap:7px">${[['24화','잠김','lock'],['23화','잠김','lock'],['22화','무료',''],['21화','무료','']].map(([n,s,b])=>`<div class="r"><div class="tn">${b==='lock'?'<div style="width:100%;height:100%;display:grid;place-items:center;color:#FF9F8C">🔒</div>':''}</div><div class="col"><div class="bar xs"></div><div class="kv">${n} · ${s}</div></div>${b==='lock'?'<span class="pill lock">D-5</span>':'<span class="pill up" style="opacity:.5">●</span>'}</div>`).join('')}<div class="note" style="margin-top:auto">목록 항목에 <b>locked·freeAt</b> 포함 → 자물쇠 배지</div></div>`,
+    '회차 목록 — 잠금 배지',['GET .../episodes','· EpisodeSummary.locked/freeAt']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">24화</div></div><div class="lockwrap"><div style="font-size:30px">🔒</div><div class="title">기다리면 무료</div><div class="sub" style="max-width:170px">이 회차는 아직 잠겨 있어요</div><div class="cd">D-5 · 22:14</div><div class="sub">7/01 00:00 무료 전환</div><div class="btn" style="width:150px;color:var(--muted)">알림 받기</div></div>`,
+    '잠긴 회차 = 200 + locked',['GET .../episodes/{no}','→ locked:true · freeAt','· 이미지·조회수 비노출']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">22화 (무료)</div><div class="sp">♡</div></div><div class="body" style="gap:5px;padding:6px"><div class="img" style="height:130px"></div><div class="img" style="height:130px"></div><div class="r" style="margin-top:auto;font-size:9.5px"><span style="color:var(--amber-ink)">♥ 980</span><span style="margin-left:auto">👁 2.2만</span></div></div>`,
+    '무료 전환된 회차 → 정상 뷰어',['GET .../episodes/{no}','→ locked:false · images[]']),
+  cell(creatorPolicy(),'(작가) 공개정책 설정',['PATCH /api/series/{id}/release-policy','→ {mode:WAIT_FREE, waitFreeDays:7}']),
+]},
+{id:'library',no:'04',ic:'🗂',name:'독자 서재 · 개인화',desc:'구독·읽음·북마크가 서재로 모인다. 열람이력·관심(북마크)·구독(UP/이어보기) 탭. 잠긴 회차 읽음은 기록 안 됨.',cells:[
+  cell(`<div class="ab"><div class="t">서재</div></div><div class="body"><div class="tabs"><span class="chip on">구독</span><span class="chip">관심</span><span class="chip">열람</span></div>${[['던전 리셋','24화 · 6/20','up'],['일상툰','12화 · 6/18',''],['로맨스','8화 · 6/15','up']].map(([t,d,b])=>`<div class="r"><div class="tn"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">${d}</div></div>${b==='up'?'<span class="pill up">UP</span>':''}</div>`).join('')}${tb('lib')}</div>`,
+    '서재 — 구독(이어보기·UP)',['GET /api/me/subscriptions','· latestNo>lastReadNo → up']),
+  cell(`<div class="ab"><div class="t">서재 · 관심</div></div><div class="body"><div class="tabs"><span class="chip">구독</span><span class="chip on">관심</span><span class="chip">열람</span></div>${[['던전 리셋','20화 저장'],['스릴러','5화 저장']].map(([t,d])=>`<div class="r"><div class="tn"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">🔖 ${d}</div></div></div>`).join('')}${tb('lib')}</div>`,
+    '관심 — 북마크',['GET /api/me/bookmarks','POST .../{no}/bookmark']),
+  cell(`<div class="ab"><div class="t">서재 · 열람</div></div><div class="body"><div class="tabs"><span class="chip">구독</span><span class="chip">관심</span><span class="chip on">열람</span></div>${[['던전 리셋','24화까지'],['일상툰','12화까지'],['로맨스','6화까지']].map(([t,d])=>`<div class="r"><div class="tn"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">📖 ${d}</div></div></div>`).join('')}${tb('lib')}</div>`,
+    '열람한 작품 (최근순)',['GET /api/me/read-history','· markRead — 잠금이면 no-op']),
+]},
+{id:'community',no:'05',ic:'💬',name:'커뮤니티 게시판',desc:'말머리·이미지·추천·댓글/대댓글(1-depth)·@멘션. 멘션 시 상대에게 알림.',cells:[
+  cell(`<div class="ab"><div class="t">커뮤니티</div><div class="sp">✎</div></div><div class="body"><div class="tabs"><span class="chip on">최신</span><span class="chip">베스트</span><span class="chip">추천</span><span class="chip">팬아트</span></div>${[['던전 리셋 정주행 후기','자유','♥ 42'],['이 장면 해석좀','질문','♥ 12'],['팬아트 그렸어요','팬아트','♥ 88']].map(([t,c,l])=>`<div class="r"><div class="tn"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv"><span class="pill amber" style="font-size:8px">${c}</span> ${l}</div></div></div>`).join('')}${tb('com')}</div>`,
+    '게시판 (말머리·정렬)',['GET /api/posts?category&sort']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">게시글</div></div><div class="body" style="gap:7px"><div class="r"><div class="tn rd"></div><div class="col"><div class="title" style="font-size:11px">지망생</div><div class="kv">방금</div></div></div><div class="bar s"></div><div class="img" style="height:90px"></div><div class="r"><div class="btn" style="flex:1">♥ 추천 42</div><div class="btn" style="flex:1">💬 8</div></div><div class="r" style="font-size:9.5px"><div class="tn rd" style="width:20px;height:20px"></div><div class="col"><div class="kv"><b style="color:var(--amber-ink)">@김작가</b> 정주행 응원!</div></div></div></div>`,
+    '글 상세 — 추천·이미지·댓글',['GET /api/posts/{id}','POST /api/posts/{id}/like']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">글쓰기</div><div class="sp" style="color:var(--amber-ink)">등록</div></div><div class="body"><div class="tabs"><span class="chip on">자유</span><span class="chip">질문</span><span class="chip">팬아트</span></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">제목</div><div style="flex:1;border:1px solid var(--line);border-radius:9px;padding:8px;font-size:10px;color:var(--muted)">내용… <b style="color:var(--amber-ink)">@닉네임</b> 멘션 가능</div><div class="r"><div class="btn" style="flex:1">🖼 이미지 ≤5</div></div></div>`,
+    '글쓰기 (multipart·@멘션)',['POST /api/posts','· @닉네임 → POST_MENTIONED 알림']),
+]},
+{id:'social',no:'06',ic:'➕',name:'팔로우 · 작가 소식 피드',desc:'작가 프로필에서 팔로우 → 팔로우한 작가들의 글이 소식 피드로 모인다.',cells:[
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">작가</div></div><div class="body"><div class="center" style="flex:none;padding:10px"><div class="tn rd" style="width:54px;height:54px"></div><div class="title">김작가</div><div class="kv">팔로워 8.2천 · 작품 3</div><div class="btn acc" style="width:130px">＋ 팔로우</div></div><div class="title" style="font-size:11px">공개 글</div>${[['신작 소식이에요'],['3화 비하인드']].map(([t])=>`<div class="r"><div class="tn"></div><div class="col"><div class="bar xs"></div><div class="kv">${t}</div></div></div>`).join('')}</div>`,
+    '작가 프로필 — 팔로우',['POST /api/users/{id}/follow','GET /api/users/{id}/follow-stats','GET /api/authors/{id}/posts']),
+  cell(`<div class="ab"><div class="t">소식 피드</div></div><div class="body">${[['김작가','신작 소식이에요','2시간'],['이작가','3화 비하인드 공개','어제'],['박작가','팬아트 이벤트','2일']].map(([a,t,d])=>`<div class="r"><div class="tn rd"></div><div class="col"><div class="kv"><b style="color:var(--text)">${a}</b> · ${d}</div><div class="title" style="font-size:11px">${t}</div></div></div>`).join('')}${tb('home')}</div>`,
+    '작가 소식 피드 (Follow⨝Post)',['GET /api/me/author-news-feed','→ 팔로우한 작가 공개글 최신순']),
+]},
+{id:'noti',no:'07',ic:'🔔',name:'알림',desc:'댓글·대댓글·팔로우·멘션·새 회차·문의답변이 인앱 알림함에 쌓인다. 종류 탭·미읽음 배지·읽음 처리 시 라우팅.',cells:[
+  cell(`<div class="ab"><div class="t">알림 <span class="pill new" style="margin-left:4px">3</span></div><div class="sp" style="color:var(--amber-ink);font-size:9px">모두 읽음</div></div><div class="body"><div class="tabs"><span class="chip on">전체</span><span class="chip">멘션</span><span class="chip">새 회차</span></div>${[['새 댓글',"내 글 '후기'에 댓글",1],['멘션',"@나 를 언급했어요",1],['새 회차',"구독작 25화 올라옴",1],['새 팔로워',"지망생님이 팔로우",0],['문의 답변',"답변이 등록됐어요",0]].map(([t,m,u])=>`<div class="r"><span class="dot" style="${u?'':'opacity:0'}"></span><div class="col"><div class="title" style="font-size:10.5px;${u?'color:var(--amber-ink)':''}">${t}</div><div class="kv">${m}</div></div></div>`).join('')}${tb('noti')}</div>`,
+    '알림함 — 종류 탭·미읽음',['GET /api/me/notifications?type=','GET .../unread-count (폴링)','GET .../unread-summary']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">읽음 → 이동</div></div><div class="center"><div style="font-size:26px">🔔→📄</div><div class="sub" style="max-width:170px">알림 클릭 = 읽음 처리 + 라우팅 정보를 한 번에 받아 해당 화면으로</div><div class="note">PATCH read 응답의 <b>targetType·targetId</b>로 이동<br>예) INQUIRY/42 → 문의 상세</div></div>`,
+    '클릭 = 읽음 + 라우팅',['PATCH /api/me/notifications/{id}/read','→ {targetType, targetId, read:true}']),
+]},
+{id:'activity',no:'08',ic:'📝',name:'내 활동내역',desc:'커뮤니티 활동: 내가 쓴 글·내 댓글·추천한 글·나를 언급한 글.',cells:[
+  cell(`<div class="ab"><div class="t">내 활동</div></div><div class="body"><div class="tabs"><span class="chip on">내 글</span><span class="chip">내 댓글</span><span class="chip">추천</span><span class="chip">언급</span></div>${[['던전 후기','♥ 42'],['질문있어요','♥ 5'],['(블라인드)','신고됨']].map(([t,d])=>`<div class="r"><div class="tn"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">${d}</div></div>${t.includes('블라')?'<span class="pill lock">blind</span>':''}</div>`).join('')}${tb('my')}</div>`,
+    '내 글 (블라인드 포함+플래그)',['GET /api/me/posts']),
+  cell(`<div class="ab"><div class="t">내 활동 · 댓글</div></div><div class="body"><div class="tabs"><span class="chip">내 글</span><span class="chip on">내 댓글</span><span class="chip">추천</span><span class="chip">언급</span></div>${[['"정주행 응원!"','원글: 던전 후기'],['"해석 동의"','원글: 이 장면']].map(([c,p])=>`<div class="r"><div class="col"><div class="title" style="font-size:10.5px">${c}</div><div class="kv">${p}</div></div></div>`).join('')}${tb('my')}</div>`,
+    '내 댓글 (원글 제목 동봉)',['GET /api/me/post-comments']),
+  cell(`<div class="ab"><div class="t">내 활동 · 언급</div></div><div class="body"><div class="tabs"><span class="chip">내 글</span><span class="chip">내 댓글</span><span class="chip">추천</span><span class="chip on">언급</span></div>${[['지망생','@나 이거 봤어?','글'],['김작가','@나 고마워요','댓글']].map(([a,m,w])=>`<div class="r"><span class="dot"></span><div class="col"><div class="kv"><b style="color:var(--text)">${a}</b> · ${w}</div><div class="title" style="font-size:10.5px">${m}</div></div></div>`).join('')}${tb('my')}</div>`,
+    '나를 언급 (알림 재사용)',['GET /api/me/notifications?type=POST_MENTIONED']),
+]},
+{id:'profile',no:'09',ic:'⚙️',name:'프로필 · 설정 · 작가 전환',desc:'내 정보·닉네임·비번·아바타·동의 내역 + 작가 전환 신청(관리자 승인).',cells:[
+  cell(`<div class="ab"><div class="t">MY</div></div><div class="body"><div class="center" style="flex:none;padding:12px 0"><div class="tn rd" style="width:54px;height:54px"></div><div class="title">독자나</div><div class="kv">reader@toon.com · READER</div></div>${['프로필 편집','비밀번호 변경','동의 내역','작가 전환 신청','로그아웃'].map(t=>`<div class="r" style="padding:4px 0;border-top:1px solid var(--line)"><div class="kv" style="font-size:11px;color:var(--text)">${t}</div><span style="margin-left:auto;color:var(--muted)">›</span></div>`).join('')}${tb('my')}</div>`,
+    'MY — 설정 허브',['GET /api/users/me','GET /api/users/me/consents']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">프로필 편집</div></div><div class="body" style="gap:9px"><div class="center" style="flex:none"><div class="tn rd" style="width:48px;height:48px"></div><div class="kv" style="color:var(--amber-ink)">아바타 변경</div></div><div class="bar xs"></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">닉네임 <span style="margin-left:auto;color:var(--good);font-size:9px">사용가능</span></div><div style="border:1px solid var(--line);border-radius:9px;padding:8px;font-size:10px;color:var(--muted);height:60px">소개…</div><div class="btn acc">저장</div></div>`,
+    '프로필 편집 (닉네임 유일)',['PATCH /api/users/me/nickname','PATCH /api/users/me/bio','POST /api/users/me/avatar']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">작가 전환</div></div><div class="center"><div style="font-size:26px">✍️</div><div class="title">작가가 되어 작품을 연재</div><div class="sub" style="max-width:170px">신청하면 관리자 검토 후 CREATOR 권한이 부여됩니다</div><div class="btn acc" style="width:140px">전환 신청</div><div class="note">관리자가 콘솔에서 승인/거부 (오클릭 시 재처리 가능)</div></div>`,
+    '작가 전환 신청 → 관리자 승인',['POST /api/users/me/creator-request','(admin) PATCH .../approve|reject']),
+]},
+{id:'creator',no:'10',ic:'🎨',name:'작가 콘솔 (업로드 · 정책)',desc:'CREATOR가 작품 등록 → 회차 이미지 업로드(예약 발행) → 장르·태그·공개정책 설정. (작가 영역은 콘솔 웹에서도.)',cells:[
+  cell(`<div class="ab"><div class="t">내 작품</div><div class="sp" style="color:var(--amber-ink)">＋</div></div><div class="body">${[['던전 리셋','연재중 · 24화'],['일상툰','연재중 · 12화']].map(([t,d])=>`<div class="r"><div class="img" style="width:40px;height:52px"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">${d}</div></div><span style="margin-left:auto;color:var(--muted)">›</span></div>`).join('')}${tb('home')}</div>`,
+    '내 작품 (작가)',['GET /api/series/mine','POST /api/series']),
+  cell(`<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">회차 업로드</div></div><div class="body" style="gap:8px"><div class="btn" style="justify-content:flex-start;color:var(--muted)">회차 제목</div><div class="img" style="height:70px"></div><div class="r"><div class="btn" style="flex:1">🖼 이미지 추가</div></div><div class="btn" style="justify-content:flex-start;color:var(--muted)">⏰ 예약 발행 (선택)</div><div class="btn acc">업로드</div><div class="note">미래 시각이면 SCHEDULED → 스케줄러가 발행 + 구독자 알림</div></div>`,
+    '회차 업로드 (multipart·예약)',['POST .../episodes (multipart)','→ 발행 시 EPISODE_PUBLISHED 알림']),
+  cell(creatorPolicy(),'장르·태그 · 공개정책',['PATCH /api/series/{id}/genre-tags','PATCH /api/series/{id}/release-policy']),
+]},
+{id:'admin',no:'11',ic:'🛡',name:'운영자 (웹 콘솔)',desc:'관리자 도구는 모바일이 아니라 웹 콘솔(/admin, 작업실 디자인)에서. 신고 처리·커뮤니티 관리·작가 신청·문의 답변·작품 분류.',cells:[
+  cell(`<div class="ab"><div class="t">🛡 신고 관리</div></div><div class="body" style="gap:7px"><div class="tabs"><span class="chip on">접수</span><span class="chip">처리</span><span class="chip">기각</span></div>${[['게시글 #2','스팸','지망생'],['댓글 #9','욕설','독자나']].map(([t,r,u])=>`<div class="r"><div class="col"><div class="title" style="font-size:10.5px">${t} · ${r}</div><div class="kv">신고자 ${u}</div></div><div class="btn" style="width:46px;height:24px;font-size:9px">상세</div></div>`).join('')}<div class="note">상세 클릭 → 대상 내용 + 기각/블라인드/삭제. 5건 누적 자동 블라인드.</div></div>`,
+    '신고 관리 (대상 내용·처리)',['GET /api/admin/reports','GET .../{id}','PATCH .../resolve']),
+  cell(`<div class="ab"><div class="t">🛡 작가 신청</div></div><div class="body" style="gap:7px">${[['지망생','전환 신청'],['그림러','전환 신청']].map(([u,s])=>`<div class="r"><div class="tn rd"></div><div class="col"><div class="title" style="font-size:11px">${u}</div><div class="kv">${s}</div></div></div><div class="r"><div class="btn acc" style="flex:1;height:26px">승인</div><div class="btn" style="flex:1;height:26px">거부</div></div>`).join('')}</div>`,
+    '작가 신청 승인/거부',['GET /api/admin/creator-requests','PATCH .../approve | reject']),
+  cell(`<div class="ab"><div class="t">🛡 커뮤니티</div></div><div class="body" style="gap:7px"><div class="btn" style="justify-content:flex-start;color:var(--muted)">🔍 키워드·말머리 검색</div>${[['던전 후기','공개'],['도배글','블라인드']].map(([t,s])=>`<div class="r"><div class="col"><div class="title" style="font-size:10.5px">${t}</div><div class="kv">${s}</div></div><div class="btn" style="width:46px;height:24px;font-size:9px">상세</div></div>`).join('')}</div>`,
+    '커뮤니티 관리 (검색·블라인드)',['GET /api/admin/posts?keyword&category','PATCH .../blind | unblind']),
+]},
+];
+
+function homeScreen(){return `<div class="ab"><div class="t">홈</div><div class="sp">🔍 🔔</div></div><div class="body"><div class="tabs"><span class="chip on">월</span><span class="chip">화</span><span class="chip">수</span><span class="chip">전체</span></div><div class="img" style="height:74px"></div><div class="tabs"><span class="chip">로맨스</span><span class="chip">판타지</span><span class="chip">액션</span></div>${[['던전 리셋','김작가','up'],['일상툰','이작가','']].map(([t,a,b])=>`<div class="r"><div class="img" style="width:40px;height:52px"></div><div class="col"><div class="title" style="font-size:11px">${t}</div><div class="kv">${a}</div></div>${b==='up'?'<span class="pill up">UP</span>':''}</div>`).join('')}${tb('home')}</div>`;}
+function creatorPolicy(){return `<div class="ab"><span style="color:var(--muted)">‹</span><div class="t">공개정책</div></div><div class="body" style="gap:9px"><div class="title" style="font-size:11px">수익 방식</div><div class="r"><div class="btn" style="flex:1;color:var(--muted)">전체무료</div><div class="btn acc" style="flex:1">기다리면무료</div></div><div class="bar xs"></div><div class="r"><div class="btn" style="justify-content:flex-start;flex:1;color:var(--muted)">무료 전환 주기</div><div class="btn" style="width:54px">7일</div></div><div class="note">compute-on-read: freeAt = publishAt + 7일. 최신화만 잠기고 지나면 무료.</div><div class="btn acc" style="margin-top:auto">저장</div></div>`;}
+
+const nav=document.getElementById('nav'), flows=document.getElementById('flows');
+nav.innerHTML=FLOWS.map((f,i)=>`<a data-t="${f.id}" class="${i===0?'on':''}"><span class="n">${f.no}</span>${f.name}</a>`).join('');
+flows.innerHTML=FLOWS.map(f=>`<section class="flow" id="f-${f.id}"><div class="flow__hd"><span class="flow__no">${f.no} ${f.ic}</span><h2>${f.name}</h2><p>${f.desc}</p></div>${rail(f.cells)}</section>`).join('');
+nav.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;document.getElementById('f-'+a.dataset.t).scrollIntoView({behavior:'smooth',block:'start'});});
+const secs=[...document.querySelectorAll('.flow')];
+const io=new IntersectionObserver(es=>{es.forEach(en=>{if(en.isIntersecting){const id=en.target.id.slice(2);nav.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.dataset.t===id));}});},{rootMargin:'-30% 0px -60% 0px'});
+secs.forEach(s=>io.observe(s));
+</script>
+</body>
+</html>

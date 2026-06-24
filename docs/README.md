@@ -40,7 +40,8 @@ npx openapi-typescript docs/openapi.json -o src/api/schema.d.ts   # TS 타입 �
 | 2 | **[`openapi.json`](openapi.json)** / Swagger | 엔드포인트 전수·요청/응답 DTO·enum 값의 **단일 출처** | 화면별 API 찾을 때 |
 | 3 | **[`features.md`](features.md)** | 각 기능이 **무엇을 하는가 + 규칙·가드·예외**(역할별 권한, 연령 게이트, 기다리면무료, 블라인드 등) | 동작·정책 이해할 때 |
 | 4 | [`deploy-guide.md`](deploy-guide.md) | 서버 실행·환경변수·배포 | 서버 직접 띄우거나 배포할 때 |
-| 5 | [`api-reference.md`](api-reference.md) | (슬림) Swagger로 일원화된 포인터 | 참고 |
+| 5 | **[`screen-flows.html`](screen-flows.html)** | **화면 플로우 Visual Companion** — 11개 사용자 흐름(온보딩·감상·기다리면무료·서재·커뮤니티·알림 등)을 모바일 와이어프레임 + 호출 API로. 브라우저로 열기 | 화면 설계·기능 감 잡을 때 |
+| 6 | [`api-reference.md`](api-reference.md) | (슬림) Swagger로 일원화된 포인터 | 참고 |
 
 루트의 실행 파일: **`.env.example`**(환경변수 템플릿: DB·`JWT_SECRET`) · **`docker-compose.yml`**(postgres + minio).
 
