@@ -50,8 +50,9 @@ public class SeriesService {
                 author,
                 request.ageRating(),
                 request.status(),
-                request.publishDays(),
-                Boolean.TRUE.equals(request.adultOnly())
+                request.publishDays() != null ? request.publishDays() : Set.of(),
+                Boolean.TRUE.equals(request.adultOnly()),
+                request.contentType() != null ? request.contentType() : ContentType.WEBTOON
         );
         series.changeGenre(request.genre() != null ? request.genre() : Genre.ETC);
         series.replaceTags(normalizeTags(request.tags()));

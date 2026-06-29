@@ -54,6 +54,11 @@ public class Series extends BaseEntity {
     @Column(nullable = false, length = 20)
     private SeriesStatus status;
 
+    // 다매체 전환(슬라이스 2): 작품 매체 구분. WEBTOON만 연재요일·회차번호를 사용한다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_type", nullable = false, length = 20)
+    private ContentType contentType = ContentType.WEBTOON;
+
     @ElementCollection
     @CollectionTable(name = "series_publish_days", joinColumns = @JoinColumn(name = "series_id"))
     @Enumerated(EnumType.STRING)
@@ -85,7 +90,7 @@ public class Series extends BaseEntity {
     private Integer waitFreeDays;
 
     private Series(String title, String description, User author, AgeRating ageRating, SeriesStatus status,
-                   Set<DayOfWeek> publishDays, boolean adultOnly) {
+                   Set<DayOfWeek> publishDays, boolean adultOnly, ContentType contentType) {
         this.title = title;
         this.description = description;
         this.author = author;
@@ -93,17 +98,24 @@ public class Series extends BaseEntity {
         this.status = status;
         this.publishDays = new HashSet<>(publishDays);
         this.adultOnly = adultOnly;
+        this.contentType = contentType;
         validateAdultConsistency();
     }
 
     public static Series create(String title, String description, User author, AgeRating ageRating,
                                 SeriesStatus status, Set<DayOfWeek> publishDays) {
-        return create(title, description, author, ageRating, status, publishDays, false);
+        return create(title, description, author, ageRating, status, publishDays, false, ContentType.WEBTOON);
     }
 
     public static Series create(String title, String description, User author, AgeRating ageRating,
                                 SeriesStatus status, Set<DayOfWeek> publishDays, boolean adultOnly) {
-        return new Series(title, description, author, ageRating, status, publishDays, adultOnly);
+        return create(title, description, author, ageRating, status, publishDays, adultOnly, ContentType.WEBTOON);
+    }
+
+    public static Series create(String title, String description, User author, AgeRating ageRating,
+                                SeriesStatus status, Set<DayOfWeek> publishDays, boolean adultOnly,
+                                ContentType contentType) {
+        return new Series(title, description, author, ageRating, status, publishDays, adultOnly, contentType);
     }
 
     public void changeAgeRating(AgeRating ageRating) {

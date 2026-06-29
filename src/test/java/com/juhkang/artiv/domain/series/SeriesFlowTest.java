@@ -128,4 +128,39 @@ class SeriesFlowTest {
                 .andExpect(jsonPath("$.ageRating").value("AGE_15"))
                 .andExpect(jsonPath("$.publishDays[0]").value("FRIDAY"));
     }
+
+    @Test
+    void 비웹툰_작품은_연재요일_없이_등록되고_콘텐츠타입이_반영된다() throws Exception {
+        createSeries(creatorToken, """
+                {"title":"일러스트집","description":"갤러리","ageRating":"ALL","status":"ONGOING","contentType":"ILLUSTRATION"}""");
+
+        String listJson = mockMvc.perform(get("/api/series").param("keyword", "일러스트집")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Integer seriesId = com.jayway.jsonpath.JsonPath.read(listJson, "$.content[0].id");
+
+        mockMvc.perform(get("/api/series/" + seriesId)
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentType").value("ILLUSTRATION"))
+                .andExpect(jsonPath("$.publishDays").isEmpty());
+    }
+
+    @Test
+    void 콘텐츠타입_미지정_작품은_WEBTOON_기본값이다() throws Exception {
+        createSeries(creatorToken, """
+                {"title":"기본웹툰","description":"","ageRating":"ALL","status":"ONGOING","publishDays":["MONDAY"]}""");
+
+        String listJson = mockMvc.perform(get("/api/series").param("day", "MONDAY")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Integer seriesId = com.jayway.jsonpath.JsonPath.read(listJson, "$.content[0].id");
+
+        mockMvc.perform(get("/api/series/" + seriesId)
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentType").value("WEBTOON"));
+    }
 }

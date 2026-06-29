@@ -1,6 +1,7 @@
 package com.juhkang.artiv.domain.series.dto;
 
 import com.juhkang.artiv.domain.series.AgeRating;
+import com.juhkang.artiv.domain.series.ContentType;
 import com.juhkang.artiv.domain.series.Genre;
 import com.juhkang.artiv.domain.series.Series;
 import com.juhkang.artiv.domain.series.SeriesStatus;
@@ -11,6 +12,7 @@ public record SeriesSummaryResponse(
         String authorNickname,
         AgeRating ageRating,
         SeriesStatus status,
+        ContentType contentType,
         Genre genre,
         boolean visible,
         boolean adultOnly
@@ -23,6 +25,7 @@ public record SeriesSummaryResponse(
                 series.getAuthor().getNickname(),
                 series.getAgeRating(),
                 series.getStatus(),
+                series.getContentType(),
                 series.getGenre(),
                 series.isVisible(),
                 series.isAdultOnly()

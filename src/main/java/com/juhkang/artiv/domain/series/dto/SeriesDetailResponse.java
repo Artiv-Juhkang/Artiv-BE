@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Set;
 
 import com.juhkang.artiv.domain.series.AgeRating;
+import com.juhkang.artiv.domain.series.ContentType;
 import com.juhkang.artiv.domain.series.Genre;
 import com.juhkang.artiv.domain.series.ReleasePolicy;
 import com.juhkang.artiv.domain.series.Series;
@@ -21,6 +22,7 @@ public record SeriesDetailResponse(
         String authorNickname,
         AgeRating ageRating,
         SeriesStatus status,
+        ContentType contentType,
         Genre genre,
         Set<DayOfWeek> publishDays,
         Set<String> tags,
@@ -42,6 +44,7 @@ public record SeriesDetailResponse(
                 series.getAuthor().getNickname(),
                 series.getAgeRating(),
                 series.getStatus(),
+                series.getContentType(),
                 series.getGenre(),
                 Set.copyOf(series.getPublishDays()), // LAZY 컬렉션을 트랜잭션 안에서 즉시 복사(세션밖 직렬화 방지)
                 Set.copyOf(series.getTags()),        // 태그도 동일하게 트랜잭션 안에서 복사
