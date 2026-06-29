@@ -1,4 +1,4 @@
-/* AppToon Studio Console — 작가/관리자 콘솔 SPA (Vanilla JS) */
+/* Artiv Studio Console — 작가/관리자 콘솔 SPA (Vanilla JS) */
 (() => {
   'use strict';
 
@@ -16,8 +16,8 @@
   const RTYPE = { POST: '게시글', COMMENT: '댓글', USER: '사용자', SERIES: '작품', EPISODE: '회차' };
 
   const state = {
-    token: localStorage.getItem('apptoon_token') || null,
-    refresh: localStorage.getItem('apptoon_refresh') || null,
+    token: localStorage.getItem('artiv_token') || null,
+    refresh: localStorage.getItem('artiv_refresh') || null,
     user: null,
     view: null,
     unread: 0,
@@ -33,19 +33,19 @@
 
   function setTokens(access, refresh) {
     state.token = access; state.refresh = refresh;
-    localStorage.setItem('apptoon_token', access);
-    localStorage.setItem('apptoon_refresh', refresh);
+    localStorage.setItem('artiv_token', access);
+    localStorage.setItem('artiv_refresh', refresh);
   }
   function clearTokens() {
     state.token = state.refresh = state.user = null;
     state.unread = 0;
     if (unreadTimer) { clearInterval(unreadTimer); unreadTimer = null; }
-    localStorage.removeItem('apptoon_token');
-    localStorage.removeItem('apptoon_refresh');
+    localStorage.removeItem('artiv_token');
+    localStorage.removeItem('artiv_refresh');
   }
 
   // ---- theme (라이트/다크/시스템) ----
-  const THEME_KEY = 'apptoon_theme';
+  const THEME_KEY = 'artiv_theme';
   const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
   const themePref = () => localStorage.getItem(THEME_KEY) || 'system';
   const resolveTheme = (pref) => (pref === 'system' ? (sysDark.matches ? 'dark' : 'light') : pref);
@@ -104,7 +104,7 @@
   // 로그인
   // ====================================================================
   function renderLogin() {
-    document.title = 'AppToon Studio — 로그인';
+    document.title = 'Artiv Studio — 로그인';
     app.innerHTML = `
       <div class="login">
         <form class="login__card panel" id="loginForm" novalidate>
@@ -327,7 +327,7 @@
         <button class="btn btn--ghost btn--sm" id="set-logout">로그아웃</button>
         <button class="btn btn--sm" data-x>닫기</button>
       </div>
-      <div class="set-foot">AppToon Studio Console</div>
+      <div class="set-foot">Artiv Studio Console</div>
     </div>`;
     document.body.appendChild(m);
     const dialog = m.querySelector('.modal');

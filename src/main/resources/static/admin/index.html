@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AppToon Studio</title>
+  <title>Artiv Studio</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,7 @@
     /* 첫 페인트 전 테마 적용 — 플래시 방지 */
     (function () {
       try {
-        var p = localStorage.getItem('apptoon_theme') || 'system';
+        var p = localStorage.getItem('artiv_theme') || 'system';
         var t = p === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : p;
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }

@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.juhkang'
 version = '0.0.1-SNAPSHOT'
-description = 'AppToon'
+description = 'Artiv'
 
 java {
     toolchain {

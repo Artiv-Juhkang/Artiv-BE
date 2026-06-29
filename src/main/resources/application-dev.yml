@@ -1,7 +1,7 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/apptoon}
-    username: ${DB_USER:apptoon}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/artiv}
+    username: ${DB_USER:artiv}
     password: ${DB_PASSWORD:devpass}
   jpa:
     show-sql: true

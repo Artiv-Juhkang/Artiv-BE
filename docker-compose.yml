@@ -1,17 +1,17 @@
 services:
   db:
     image: postgres:16
-    container_name: apptoon-db
+    container_name: artiv-db
     environment:
-      POSTGRES_DB: apptoon
-      POSTGRES_USER: apptoon
+      POSTGRES_DB: artiv
+      POSTGRES_USER: artiv
       POSTGRES_PASSWORD: devpass
     ports:
       - "5432:5432"
     volumes:
-      - apptoon-db-data:/var/lib/postgresql/data
+      - artiv-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apptoon -d apptoon"]
+      test: ["CMD-SHELL", "pg_isready -U artiv -d artiv"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,7 +20,7 @@ services:
   # S3 호환 오브젝트 스토리지(로컬 개발용). 운영은 R2/AWS S3 등으로 대체.
   minio:
     image: minio/minio
-    container_name: apptoon-minio
+    container_name: artiv-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -29,7 +29,7 @@ services:
       - "9000:9000"      # S3 API
       - "9001:9001"      # 웹 콘솔
     volumes:
-      - apptoon-minio-data:/data
+      - artiv-minio-data:/data
     restart: unless-stopped
 
   # 버킷 생성 + 익명 다운로드 허용(이미지 public read). 한 번 실행 후 종료.
@@ -40,10 +40,10 @@ services:
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 minioadmin minioadmin; do echo 'waiting for minio'; sleep 1; done;
-      mc mb -p local/apptoon;
-      mc anonymous set download local/apptoon;
+      mc mb -p local/artiv;
+      mc anonymous set download local/artiv;
       "
 
 volumes:
-  apptoon-db-data:
-  apptoon-minio-data:
+  artiv-db-data:
+  artiv-minio-data:

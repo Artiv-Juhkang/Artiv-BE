@@ -28,7 +28,7 @@ class OpenApiDocsTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openapi").exists())
-                .andExpect(jsonPath("$.info.title").value("AppToon API"))
+                .andExpect(jsonPath("$.info.title").value("Artiv API"))
                 .andExpect(content().string(containsString("/api/series")))
                 .andExpect(content().string(containsString("/api/auth/signup")));
     }

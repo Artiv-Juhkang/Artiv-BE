@@ -15,10 +15,10 @@ public class OpenApiConfig {
     private static final String BEARER = "bearerAuth";
 
     @Bean
-    public OpenAPI appToonOpenAPI() {
+    public OpenAPI artivOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("AppToon API")
+                        .title("Artiv API")
                         .version("v1")
                         .description("웹툰 플랫폼 백엔드 REST API — 인증(JWT)·작품/회차·뷰어(19금 가드·이미지 정적 서빙)"
                                 + "·개인화(구독·읽음·북마크)·소셜(댓글·좋아요)·조회수·성인전용 분류·관리자."))

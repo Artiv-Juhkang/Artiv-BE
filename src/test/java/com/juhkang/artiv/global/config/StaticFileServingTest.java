@@ -34,7 +34,7 @@ class StaticFileServingTest {
 
     @DynamicPropertySource
     static void storageProps(DynamicPropertyRegistry registry) throws IOException {
-        storageRoot = Files.createTempDirectory("apptoon-static-test");
+        storageRoot = Files.createTempDirectory("artiv-static-test");
         registry.add("app.storage.root", () -> storageRoot.toString());
     }
 
