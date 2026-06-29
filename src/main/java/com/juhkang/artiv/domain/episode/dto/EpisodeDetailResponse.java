@@ -9,6 +9,7 @@ import com.juhkang.artiv.domain.episode.access.AccessResult;
 import com.juhkang.artiv.domain.episode.access.LockReason;
 
 public record EpisodeDetailResponse(
+        Long id,
         int episodeNo,
         String title,
         EpisodeStatus status,
@@ -25,6 +26,7 @@ public record EpisodeDetailResponse(
     public static EpisodeDetailResponse of(Episode episode, List<EpisodeImageResponse> images,
                                            long likeCount, boolean liked, AccessResult access) {
         return new EpisodeDetailResponse(
+                episode.getId(),
                 episode.getEpisodeNo(),
                 episode.getTitle(),
                 episode.getStatus(),
@@ -42,6 +44,7 @@ public record EpisodeDetailResponse(
     /** 잠긴 회차: 메타+freeAt만, 이미지·좋아요수 노출 안 함(이미지 URL 유추 차단). */
     public static EpisodeDetailResponse locked(Episode episode, AccessResult access) {
         return new EpisodeDetailResponse(
+                episode.getId(),
                 episode.getEpisodeNo(),
                 episode.getTitle(),
                 episode.getStatus(),
