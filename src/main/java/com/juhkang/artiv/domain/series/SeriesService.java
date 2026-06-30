@@ -84,11 +84,12 @@ public class SeriesService {
         return new SeriesReleasePolicyResponse(series.getReleasePolicy(), series.getWaitFreeDays());
     }
 
-    public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, Genre genre, String keyword,
+    public PageResponse<SeriesSummaryResponse> getList(DayOfWeek day, AgeRating ageRating, Genre genre,
+                                                       ContentType contentType, String keyword,
                                                        Boolean adultOnly, String tag, SeriesSort sort, Pageable pageable) {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort());
         String normTag = (tag != null && !tag.isBlank()) ? tag.strip() : null;
-        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, genre, keyword, adultOnly, normTag, sorted)
+        Page<SeriesSummaryResponse> page = seriesRepository.search(day, ageRating, genre, contentType, keyword, adultOnly, normTag, sorted)
                 .map(SeriesSummaryResponse::of);
         return PageResponse.from(page);
     }

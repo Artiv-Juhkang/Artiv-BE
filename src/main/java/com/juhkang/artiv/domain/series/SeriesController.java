@@ -53,12 +53,13 @@ public class SeriesController {
             @RequestParam(required = false) DayOfWeek day,
             @RequestParam(required = false) AgeRating ageRating,
             @RequestParam(required = false) Genre genre,
+            @RequestParam(required = false) ContentType contentType,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean adultOnly,
             @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "LATEST") SeriesSort sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        return seriesService.getList(day, ageRating, genre, keyword, adultOnly, tag, sort, pageable);
+        return seriesService.getList(day, ageRating, genre, contentType, keyword, adultOnly, tag, sort, pageable);
     }
 
     @PatchMapping("/{id}/genre-tags")

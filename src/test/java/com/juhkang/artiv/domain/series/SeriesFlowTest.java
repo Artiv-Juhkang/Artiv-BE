@@ -163,4 +163,19 @@ class SeriesFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contentType").value("WEBTOON"));
     }
+
+    @Test
+    void 콘텐츠타입으로_목록을_필터한다() throws Exception {
+        createSeries(creatorToken, """
+                {"title":"필터웹툰","description":"","ageRating":"ALL","status":"ONGOING","publishDays":["MONDAY"]}""");
+        createSeries(creatorToken, """
+                {"title":"필터일러","description":"","ageRating":"ALL","status":"ONGOING","contentType":"ILLUSTRATION"}""");
+
+        mockMvc.perform(get("/api/series").param("contentType", "ILLUSTRATION")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("필터일러"))
+                .andExpect(jsonPath("$.content[0].contentType").value("ILLUSTRATION"));
+    }
 }
