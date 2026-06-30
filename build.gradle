@@ -51,4 +51,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'openapi.snapshot', System.getProperty('openapi.snapshot', '')
 }
