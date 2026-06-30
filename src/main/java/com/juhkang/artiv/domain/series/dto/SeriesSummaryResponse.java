@@ -15,7 +15,8 @@ public record SeriesSummaryResponse(
         ContentType contentType,
         Genre genre,
         boolean visible,
-        boolean adultOnly
+        boolean adultOnly,
+        String coverUrl
 ) {
 
     public static SeriesSummaryResponse of(Series series) {
@@ -28,7 +29,8 @@ public record SeriesSummaryResponse(
                 series.getContentType(),
                 series.getGenre(),
                 series.isVisible(),
-                series.isAdultOnly()
+                series.isAdultOnly(),
+                series.getCoverUrl()
         );
     }
 }

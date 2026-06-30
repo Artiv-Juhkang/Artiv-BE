@@ -23,6 +23,7 @@ public record SeriesDetailResponse(
         AgeRating ageRating,
         SeriesStatus status,
         ContentType contentType,
+        String coverUrl,
         Genre genre,
         Set<DayOfWeek> publishDays,
         Set<String> tags,
@@ -45,6 +46,7 @@ public record SeriesDetailResponse(
                 series.getAgeRating(),
                 series.getStatus(),
                 series.getContentType(),
+                series.getCoverUrl(),
                 series.getGenre(),
                 Set.copyOf(series.getPublishDays()), // LAZY 컬렉션을 트랜잭션 안에서 즉시 복사(세션밖 직렬화 방지)
                 Set.copyOf(series.getTags()),        // 태그도 동일하게 트랜잭션 안에서 복사

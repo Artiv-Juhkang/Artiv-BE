@@ -80,6 +80,10 @@ public class Series extends BaseEntity {
     @Column(nullable = false)
     private boolean adultOnly = false;
 
+    // 표출 seam(다매체): 커버 아트 URL. 없으면 프론트 placeholder. 설정은 후속(작가 업로드).
+    @Column(name = "cover_url", length = 500)
+    private String coverUrl;
+
     // 수익화 0단계: 작품 공개정책(결제 없음). 기존 작품은 V22에서 FREE_ALL backfill.
     @Enumerated(EnumType.STRING)
     @Column(name = "release_policy", nullable = false, length = 20)
