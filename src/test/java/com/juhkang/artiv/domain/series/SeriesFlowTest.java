@@ -178,4 +178,15 @@ class SeriesFlowTest {
                 .andExpect(jsonPath("$.content[0].title").value("필터일러"))
                 .andExpect(jsonPath("$.content[0].contentType").value("ILLUSTRATION"));
     }
+
+    @Test
+    void 창작물_타입_레지스트리를_조회한다() throws Exception {
+        mockMvc.perform(get("/api/creativity/types")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$[0].key").value("WEBTOON"))
+                .andExpect(jsonPath("$[0].serialized").value(true))
+                .andExpect(jsonPath("$[0].assetKinds[0]").value("IMAGE"));
+    }
 }
