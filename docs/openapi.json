@@ -604,6 +604,49 @@
         }
       }
     },
+    "/api/series/{id}/cover" : {
+      "post" : {
+        "tags" : [ "series-controller" ],
+        "operationId" : "setCover",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "cover" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "cover" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SeriesCoverResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports" : {
       "post" : {
         "tags" : [ "report-controller" ],
@@ -2753,6 +2796,14 @@
           }
         },
         "required" : [ "content" ]
+      },
+      "SeriesCoverResponse" : {
+        "type" : "object",
+        "properties" : {
+          "coverUrl" : {
+            "type" : "string"
+          }
+        }
       },
       "ReportCreateRequest" : {
         "type" : "object",

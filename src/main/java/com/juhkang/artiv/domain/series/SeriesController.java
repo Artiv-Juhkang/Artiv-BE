@@ -16,9 +16,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.juhkang.artiv.domain.series.dto.SeriesCoverResponse;
 import com.juhkang.artiv.domain.series.dto.SeriesCreateRequest;
 import com.juhkang.artiv.domain.series.dto.SeriesDetailResponse;
 import com.juhkang.artiv.domain.auth.AuthSupport;
@@ -81,6 +84,14 @@ public class SeriesController {
     @GetMapping("/mine")
     public List<SeriesSummaryResponse> mySeries(@AuthenticationPrincipal Long userId) {
         return seriesService.getMySeries(userId);
+    }
+
+    @PostMapping("/{id}/cover")
+    @PreAuthorize("hasRole('CREATOR')")
+    public SeriesCoverResponse setCover(@AuthenticationPrincipal Long userId,
+                                        @PathVariable Long id,
+                                        @RequestPart("cover") MultipartFile cover) {
+        return new SeriesCoverResponse(seriesService.setCover(userId, id, cover));
     }
 
     @GetMapping("/{id}")

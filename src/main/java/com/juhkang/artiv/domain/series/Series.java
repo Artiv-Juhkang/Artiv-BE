@@ -151,6 +151,13 @@ public class Series extends BaseEntity {
         validateAdultConsistency();
     }
 
+    /** 커버 아트 URL 설정(작가 업로드). null/빈값은 무시해 기존 커버를 지우지 않는다. */
+    public void changeCover(String url) {
+        if (url != null && !url.isBlank()) {
+            this.coverUrl = url;
+        }
+    }
+
     /** 회차 발행 시 최신 발행시각 반영(비정규화 — '최근 업데이트' 정렬용). 더 최신일 때만 전진. */
     public void markEpisodePublished(Instant publishedAt) {
         if (publishedAt != null && (lastPublishedAt == null || publishedAt.isAfter(lastPublishedAt))) {

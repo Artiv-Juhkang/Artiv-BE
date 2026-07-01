@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.artiv.domain.episode.EpisodeRepository;
 import com.juhkang.artiv.domain.episode.EpisodeStatus;
@@ -27,6 +28,7 @@ import com.juhkang.artiv.domain.user.UserRepository;
 import com.juhkang.artiv.global.dto.PageResponse;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
+import com.juhkang.artiv.global.storage.ImageStorageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,6 +41,7 @@ public class SeriesService {
     private final UserRepository userRepository;
     private final EpisodeRepository episodeRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final ImageStorageService imageStorageService;
 
     @Transactional
     public Long create(Long authorId, SeriesCreateRequest request) {
@@ -111,6 +114,20 @@ public class SeriesService {
         return seriesRepository.findByAuthorId(authorId).stream()
                 .map(SeriesSummaryResponse::of)
                 .toList();
+    }
+
+    /** 커버 이미지 업로드 — 작가 본인만. 저장 후 coverUrl을 설정하고 새 URL을 반환한다. */
+    @Transactional
+    public String setCover(Long authorId, Long seriesId, MultipartFile image) {
+        Series series = seriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!series.isAuthoredBy(authorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        List<ImageStorageService.Stored> stored = imageStorageService.store(seriesId + "/cover", List.of(image));
+        String url = imageStorageService.urlFor(stored.get(0).path());
+        series.changeCover(url);
+        return url;
     }
 
     public SeriesDetailResponse getDetail(Long id, Long viewerId, boolean isAdmin) {
