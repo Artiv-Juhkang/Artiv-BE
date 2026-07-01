@@ -70,7 +70,8 @@ public class EpisodeService {
             ImageStorageService.Stored s = stored.get(order);
             episodeImageRepository.save(EpisodeImage.create(episode, order, s.path(), s.width(), s.height()));
         }
-        if (!scheduled) {                       // 즉시 발행 → 구독자에게 알림(예약은 발행 시점에)
+        if (!scheduled) {                       // 즉시 발행 → 최근업데이트 갱신 + 구독자 알림(예약은 발행 시점에)
+            series.markEpisodePublished(effectivePublishAt);
             notifySubscribers(series, episode);
         }
         return episodeNo;
@@ -81,6 +82,7 @@ public class EpisodeService {
         episodeRepository.findByStatusAndPublishAtLessThanEqual(EpisodeStatus.SCHEDULED, now)
                 .forEach(ep -> {
                     ep.markPublished();
+                    ep.getSeries().markEpisodePublished(ep.getPublishAt());  // 최근업데이트 전진
                     notifySubscribers(ep.getSeries(), ep);   // SCHEDULED→PUBLISHED 전환 시 알림
                 });
     }

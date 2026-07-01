@@ -11,6 +11,10 @@ public enum SeriesSort {
     /** 최신 등록순(기본). */
     LATEST(Sort.by(Sort.Direction.DESC, "id")),
 
+    /** 최근 업데이트순 — 최신 발행 회차 시각(last_published_at) DESC, 회차 없는 작품은 뒤로(NULLS LAST). */
+    UPDATED(Sort.by(new Sort.Order(Sort.Direction.DESC, "lastPublishedAt").nullsLast(),
+            new Sort.Order(Sort.Direction.DESC, "id"))),
+
     /** 성인 전용(adultOnly=true) 작품을 먼저. */
     ADULT_FIRST(Sort.by(Sort.Direction.DESC, "adultOnly", "id"));
 

@@ -17,7 +17,8 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
             + "and (:ageRating is null or s.ageRating = :ageRating) "
             + "and (:genre is null or s.genre = :genre) "
             + "and (:contentType is null or s.contentType = :contentType) "
-            + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%'))) "
+            + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%')) "
+            + "      or lower(s.author.nickname) like lower(concat('%', cast(:keyword as string), '%'))) "
             + "and (:adultOnly is null or s.adultOnly = :adultOnly) "
             + "and (:tag is null or :tag member of s.tags)",
             countQuery = "select count(s) from Series s "
@@ -26,7 +27,8 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
                     + "and (:ageRating is null or s.ageRating = :ageRating) "
                     + "and (:genre is null or s.genre = :genre) "
                     + "and (:contentType is null or s.contentType = :contentType) "
-                    + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%'))) "
+                    + "and (:keyword is null or lower(s.title) like lower(concat('%', cast(:keyword as string), '%')) "
+            + "      or lower(s.author.nickname) like lower(concat('%', cast(:keyword as string), '%'))) "
                     + "and (:adultOnly is null or s.adultOnly = :adultOnly) "
                     + "and (:tag is null or :tag member of s.tags)")
     Page<Series> search(@Param("day") DayOfWeek day, @Param("ageRating") AgeRating ageRating,

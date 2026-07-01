@@ -1,6 +1,7 @@
 package com.juhkang.artiv.domain.series;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -84,6 +85,10 @@ public class Series extends BaseEntity {
     @Column(name = "cover_url", length = 500)
     private String coverUrl;
 
+    // 비정규화: 최신 PUBLISHED 회차 발행시각('최근 업데이트' 정렬용, V26). 발행 시 전진 갱신.
+    @Column(name = "last_published_at")
+    private Instant lastPublishedAt;
+
     // 수익화 0단계: 작품 공개정책(결제 없음). 기존 작품은 V22에서 FREE_ALL backfill.
     @Enumerated(EnumType.STRING)
     @Column(name = "release_policy", nullable = false, length = 20)
@@ -144,6 +149,13 @@ public class Series extends BaseEntity {
     public void changeAdultOnly(boolean adultOnly) {
         this.adultOnly = adultOnly;
         validateAdultConsistency();
+    }
+
+    /** 회차 발행 시 최신 발행시각 반영(비정규화 — '최근 업데이트' 정렬용). 더 최신일 때만 전진. */
+    public void markEpisodePublished(Instant publishedAt) {
+        if (publishedAt != null && (lastPublishedAt == null || publishedAt.isAfter(lastPublishedAt))) {
+            this.lastPublishedAt = publishedAt;
+        }
     }
 
     /** 작가 공개정책 변경. FREE_ALL로 바꾸면 waitFreeDays 잔여값을 청소(불변식 유지). */
