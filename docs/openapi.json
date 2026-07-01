@@ -3452,6 +3452,10 @@
           },
           "coverUrl" : {
             "type" : "string"
+          },
+          "lastPublishedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

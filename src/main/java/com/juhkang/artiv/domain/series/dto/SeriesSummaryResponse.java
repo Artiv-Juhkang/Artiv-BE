@@ -1,5 +1,7 @@
 package com.juhkang.artiv.domain.series.dto;
 
+import java.time.Instant;
+
 import com.juhkang.artiv.domain.series.AgeRating;
 import com.juhkang.artiv.domain.series.ContentType;
 import com.juhkang.artiv.domain.series.Genre;
@@ -16,7 +18,9 @@ public record SeriesSummaryResponse(
         Genre genre,
         boolean visible,
         boolean adultOnly,
-        String coverUrl
+        String coverUrl,
+        // 최신 발행 회차 시각(V26). 프론트가 'UP'(24h 이내 업데이트) 배지 판정에 쓴다. 회차 없으면 null.
+        Instant lastPublishedAt
 ) {
 
     public static SeriesSummaryResponse of(Series series) {
@@ -30,7 +34,8 @@ public record SeriesSummaryResponse(
                 series.getGenre(),
                 series.isVisible(),
                 series.isAdultOnly(),
-                series.getCoverUrl()
+                series.getCoverUrl(),
+                series.getLastPublishedAt()
         );
     }
 }
