@@ -36,14 +36,27 @@ public class CommentController {
                             @PathVariable Long seriesId,
                             @PathVariable int episodeNo,
                             @Valid @RequestBody CommentCreateRequest request) {
-        return new IdResponse(commentService.write(userId, seriesId, episodeNo, request.content()));
+        return new IdResponse(commentService.write(userId, seriesId, episodeNo, request.content(), request.parentId()));
     }
 
     @GetMapping
-    public PageResponse<CommentResponse> list(@PathVariable Long seriesId,
+    public PageResponse<CommentResponse> list(@AuthenticationPrincipal Long userId,
+                                              @PathVariable Long seriesId,
                                               @PathVariable int episodeNo,
                                               @PageableDefault(size = 20) Pageable pageable) {
-        return commentService.getComments(seriesId, episodeNo, pageable);
+        return commentService.getComments(seriesId, episodeNo, userId, pageable);
+    }
+
+    @PostMapping("/{commentId}/like")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void like(@AuthenticationPrincipal Long userId, @PathVariable Long commentId) {
+        commentService.like(userId, commentId);
+    }
+
+    @DeleteMapping("/{commentId}/like")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unlike(@AuthenticationPrincipal Long userId, @PathVariable Long commentId) {
+        commentService.unlike(userId, commentId);
     }
 
     @DeleteMapping("/{commentId}")

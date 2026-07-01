@@ -38,14 +38,23 @@ public class Comment extends BaseEntity {
     @Column(nullable = false, length = 1000)
     private String content;
 
-    private Comment(User user, Episode episode, String content) {
+    /** 대댓글이면 최상위 부모 댓글 id, 최상위 댓글이면 null(1-depth). */
+    @Column(name = "parent_id")
+    private Long parentId;
+
+    private Comment(User user, Episode episode, String content, Long parentId) {
         this.user = user;
         this.episode = episode;
         this.content = content;
+        this.parentId = parentId;
     }
 
-    public static Comment create(User user, Episode episode, String content) {
-        return new Comment(user, episode, content);
+    public static Comment create(User user, Episode episode, String content, Long parentId) {
+        return new Comment(user, episode, content, parentId);
+    }
+
+    public boolean isReply() {
+        return parentId != null;
     }
 
     public boolean isOwnedBy(Long userId) {
