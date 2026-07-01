@@ -18,13 +18,14 @@ public record EpisodeDetailResponse(
         long viewCount,
         long likeCount,
         boolean liked,
+        long commentCount,
         boolean locked,
         LockReason lockReason,
         Instant freeAt
 ) {
 
     public static EpisodeDetailResponse of(Episode episode, List<EpisodeImageResponse> images,
-                                           long likeCount, boolean liked, AccessResult access) {
+                                           long likeCount, boolean liked, long commentCount, AccessResult access) {
         return new EpisodeDetailResponse(
                 episode.getId(),
                 episode.getEpisodeNo(),
@@ -35,6 +36,7 @@ public record EpisodeDetailResponse(
                 episode.getViewCount(),
                 likeCount,
                 liked,
+                commentCount,
                 !access.accessible(),
                 access.lockReason(),
                 access.freeAt()
@@ -50,10 +52,11 @@ public record EpisodeDetailResponse(
                 episode.getStatus(),
                 episode.getPublishAt(),
                 List.of(),
-                0L,
-                0L,
-                false,
-                true,
+                0L,     // viewCount
+                0L,     // likeCount
+                false,  // liked
+                0L,     // commentCount
+                true,   // locked
                 access.lockReason(),
                 access.freeAt()
         );

@@ -16,6 +16,7 @@ import com.juhkang.artiv.domain.episode.access.AccessResult;
 import com.juhkang.artiv.domain.episode.access.EpisodeAccessEvaluator;
 import com.juhkang.artiv.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.artiv.domain.notification.NotificationService;
+import com.juhkang.artiv.domain.comment.CommentRepository;
 import com.juhkang.artiv.domain.notification.NotificationTargetType;
 import com.juhkang.artiv.domain.notification.NotificationType;
 import com.juhkang.artiv.domain.personalization.SubscriptionRepository;
@@ -49,6 +50,7 @@ public class EpisodeService {
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationService notificationService;
     private final EpisodeAccessEvaluator episodeAccessEvaluator;
+    private final CommentRepository commentRepository;
 
     @Transactional
     public int upload(Long userId, Long seriesId, String title, Instant publishAt, List<MultipartFile> images) {
@@ -160,7 +162,8 @@ public class EpisodeService {
                 .toList();
         long likeCount = episodeLikeRepository.countByEpisodeId(episode.getId());
         boolean liked = episodeLikeRepository.existsByUserIdAndEpisodeId(viewerId, episode.getId());
-        return EpisodeDetailResponse.of(episode, images, likeCount, liked, access);
+        long commentCount = commentRepository.countByEpisodeId(episode.getId());
+        return EpisodeDetailResponse.of(episode, images, likeCount, liked, commentCount, access);
     }
 
     @Transactional
