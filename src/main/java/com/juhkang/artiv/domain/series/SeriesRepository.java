@@ -39,6 +39,11 @@ public interface SeriesRepository extends JpaRepository<Series, Long> {
     @Query("select s from Series s join fetch s.author where s.author.id = :authorId order by s.id desc")
     List<Series> findByAuthorId(@Param("authorId") Long authorId);
 
+    /** 작가 공개 프로필용 — 해당 작가의 공개(visible) 작품만, 최신 등록순. */
+    @Query("select s from Series s join fetch s.author "
+            + "where s.author.id = :authorId and s.visible = true order by s.id desc")
+    List<Series> findVisibleByAuthorId(@Param("authorId") Long authorId);
+
     /** 관리자용: visible 무관(또는 옵셔널 필터) 전체 작품. 비공개 작품도 관리 목록에 보이게. */
     @Query(value = "select s from Series s join fetch s.author "
             + "where (:visible is null or s.visible = :visible) order by s.id desc",

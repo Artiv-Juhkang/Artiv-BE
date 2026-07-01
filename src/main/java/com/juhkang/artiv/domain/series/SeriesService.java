@@ -116,6 +116,13 @@ public class SeriesService {
                 .toList();
     }
 
+    /** 작가 공개 프로필 — 특정 작가의 공개 작품 목록(비공개 제외). 인증 사용자 누구나. */
+    public List<SeriesSummaryResponse> getAuthorSeries(Long authorId) {
+        return seriesRepository.findVisibleByAuthorId(authorId).stream()
+                .map(SeriesSummaryResponse::of)
+                .toList();
+    }
+
     /** 커버 이미지 업로드 — 작가 본인만. 저장 후 coverUrl을 설정하고 새 URL을 반환한다. */
     @Transactional
     public String setCover(Long authorId, Long seriesId, MultipartFile image) {
