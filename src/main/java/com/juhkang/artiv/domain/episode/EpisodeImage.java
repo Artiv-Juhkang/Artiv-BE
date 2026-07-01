@@ -64,4 +64,17 @@ public class EpisodeImage {
     public static EpisodeImage create(Episode episode, int sortOrder, String path, int width, int height) {
         return new EpisodeImage(episode, sortOrder, path, width, height);
     }
+
+    /** 비이미지 자산(소설 본문·오디오). 픽셀 치수는 없어 width/height는 null로 둔다. */
+    public static EpisodeImage createMedia(Episode episode, int sortOrder, String path,
+                                           MediaKind mediaKind, String mimeType, Long durationMs) {
+        EpisodeImage image = new EpisodeImage();
+        image.episode = episode;
+        image.sortOrder = sortOrder;
+        image.path = path;
+        image.mediaKind = mediaKind;
+        image.mimeType = mimeType;
+        image.durationMs = durationMs;
+        return image;
+    }
 }

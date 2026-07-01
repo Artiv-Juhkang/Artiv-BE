@@ -29,6 +29,7 @@ import com.juhkang.artiv.global.dto.SliceResponse;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 import com.juhkang.artiv.global.storage.ImageStorageService;
+import com.juhkang.artiv.global.storage.MediaStorageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +45,7 @@ public class EpisodeService {
     private final SeriesAccessChecker seriesAccessChecker;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final MediaStorageService mediaStorageService;
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationService notificationService;
     private final EpisodeAccessEvaluator episodeAccessEvaluator;
@@ -65,10 +67,24 @@ public class EpisodeService {
         Episode episode = episodeRepository.save(
                 Episode.create(series, episodeNo, title, status, effectivePublishAt));
 
-        List<ImageStorageService.Stored> stored = imageStorageService.store(seriesId, episodeNo, images);
-        for (int order = 0; order < stored.size(); order++) {
-            ImageStorageService.Stored s = stored.get(order);
-            episodeImageRepository.save(EpisodeImage.create(episode, order, s.path(), s.width(), s.height()));
+        // 매체 종류는 작품 타입이 결정한다(WEBTOON/일러스트…=IMAGE, 소설=TEXT, 음악=AUDIO).
+        // 이미지는 검증·리사이즈가 필요해 ImageStorageService, 텍스트/오디오는 원본 저장.
+        MediaKind assetKind = series.getContentType().getAssetKinds().get(0);
+        if (assetKind == MediaKind.IMAGE) {
+            List<ImageStorageService.Stored> stored = imageStorageService.store(seriesId, episodeNo, images);
+            for (int order = 0; order < stored.size(); order++) {
+                ImageStorageService.Stored s = stored.get(order);
+                episodeImageRepository.save(EpisodeImage.create(episode, order, s.path(), s.width(), s.height()));
+            }
+        } else {
+            List<MediaStorageService.Stored> stored = assetKind == MediaKind.TEXT
+                    ? mediaStorageService.storeText(seriesId, episodeNo, images)
+                    : mediaStorageService.storeAudio(seriesId, episodeNo, images);
+            for (int order = 0; order < stored.size(); order++) {
+                MediaStorageService.Stored s = stored.get(order);
+                episodeImageRepository.save(
+                        EpisodeImage.createMedia(episode, order, s.path(), assetKind, s.mimeType(), null));
+            }
         }
         if (!scheduled) {                       // 즉시 발행 → 최근업데이트 갱신 + 구독자 알림(예약은 발행 시점에)
             series.markEpisodePublished(effectivePublishAt);

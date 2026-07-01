@@ -9,7 +9,8 @@ improvement.md 2번: "회차 정보를 포함한 임시 데이터를 매체별�
 무엇을 만드나:
   - 창작자 3명(라온=기존 creator@artiv.test, 미루, 단우) + 데모 독자 1명(구름).
   - 웹툰 7편: 각각 다른 요일(MON..SUN)에 고정, 회차 4~7개.
-  - 소설 3편: 회차를 이미지 '페이지'로(현재 모델에 텍스트 회차 경로가 없음 — 백엔드 후속).
+  - 소설 3편: 회차를 텍스트 본문(mediaKind=TEXT)으로 업로드.
+  - 음악 2편: 트랙(회차)마다 짧은 톤 WAV(mediaKind=AUDIO).
   - 일러스트/사진/디자인/손그림 각 4~5편: 단일물(회차 1개 + 이미지 여러 장).
   - 성인(AGE_19, adultOnly) 웹툰 1편으로 연령 게이트 시연.
   - 독자가 웹툰 3편 구독 후 새 회차를 올려 EPISODE_PUBLISHED 알림이 실제로 fan-out 되게.
@@ -25,10 +26,12 @@ improvement.md 2번: "회차 정보를 포함한 임시 데이터를 매체별�
 """
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
 import tempfile
+import wave
 import zlib
 import struct
 
@@ -95,6 +98,38 @@ def build_image_pool(d, w=720, h=1024):
     return paths
 
 # ──────────────────────────────────────────────────────────────────────────
+#  소설 본문(TEXT) / 오디오(WAV) 생성 — 표준 라이브러리만
+# ──────────────────────────────────────────────────────────────────────────
+
+_PARAS = [
+    "가을 바람이 창틈으로 스며들던 밤, 나는 오래 미뤄둔 편지를 꺼냈다.",
+    "도시의 불빛은 강물 위에서 잘게 부서졌고, 그 위로 낮은 뱃고동이 지나갔다.",
+    "우리는 아무 말도 하지 않았지만, 그 침묵이 오히려 많은 것을 말해 주었다.",
+    "새벽이 오기 전 가장 어두운 골목에서, 그는 처음으로 뒤를 돌아보았다.",
+    "기억은 물결처럼 밀려왔다가, 손을 뻗으면 어느새 저만치 물러나 있었다.",
+    "봄은 언제나 예고 없이 왔고, 우리는 늘 준비되지 않은 채로 그것을 맞았다.",
+]
+
+def _novel_text(path, title, n):
+    body = [f"{title} — {n}화", ""]
+    for i in range(6):
+        body.append(_PARAS[(n + i) % len(_PARAS)])
+        body.append("")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(body))
+
+def _write_wav(path, seconds, freq, rate=8000):
+    """짧은 사인파 톤 WAV(모노 16bit) — 오디오 플레이어 시연용 최소 자산."""
+    with wave.open(path, "w") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        frames = bytearray()
+        for i in range(int(seconds * rate)):
+            frames += struct.pack("<h", int(32767 * 0.2 * math.sin(2 * math.pi * freq * i / rate)))
+        w.writeframes(bytes(frames))
+
+# ──────────────────────────────────────────────────────────────────────────
 #  HTTP (curl) / DB (psql)
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -125,6 +160,13 @@ def upload_episode(token, series_id, title, image_paths):
     for p in image_paths:
         args += ["-F", f"images=@{p};type=image/png"]
     code, _ = _curl(args)
+    return code
+
+def upload_media_episode(token, series_id, title, path, mime):
+    """비이미지 회차(소설 TEXT / 음악 AUDIO) 업로드 — 파트명은 이미지와 동일('images')."""
+    code, _ = _curl(["-X", "POST", f"{API}/api/series/{series_id}/episodes",
+                     "-H", f"Authorization: Bearer {token}", "-F", f"title={title}",
+                     "-F", f"images=@{path};type={mime}"])
     return code
 
 def subscribe(token, series_id):
@@ -206,6 +248,12 @@ SINGLES = [
     ("펜선 연습",   "miru", "DRAWING", "ETC",   "ALL", 3, ["펜선"]),
 ]
 
+# 음악(AUDIO, 연재): (제목, 작가키, 장르, 연령, 트랙수, 태그들) — 트랙(회차)마다 짧은 톤 WAV
+AUDIOS = [
+    ("밤의 라디오", "raon", "DAILY", "ALL",    3, ["로파이", "밤"]),
+    ("빗소리 연작", "miru", "ETC",   "ALL",    2, ["앰비언트", "비"]),
+]
+
 
 def pick(pool, *seeds):
     """풀에서 deterministic하게 1장 선택(랜덤 금지)."""
@@ -261,14 +309,27 @@ def main():
         if day in ("MONDAY", "WEDNESDAY", "FRIDAY"):  # 알림 시연용 구독 대상
             notify_targets.append((sid, tokens[ck], f"{eps + 1}화"))
 
-    print("• 소설 3편 …")
+    print("• 소설 3편(텍스트 본문) …")
     for title, ck, genre, age, eps, tags in NOVELS:
         sid = create_series(tokens[ck], title, "NOVEL", genre, age, "ONGOING", False, None, tags)
         if not sid:
             continue
         for n in range(1, eps + 1):
-            upload_episode(tokens[ck], sid, f"{n}화", [pick(pool, sid, n, 7)])
+            txt = os.path.join(tmp, f"novel-{sid}-{n}.txt")
+            _novel_text(txt, title, n)
+            upload_media_episode(tokens[ck], sid, f"{n}화", txt, "text/plain")
         created.append((sid, "NOVEL", title))
+
+    print("• 음악 2편(오디오 트랙) …")
+    for title, ck, genre, age, tracks, tags in AUDIOS:
+        sid = create_series(tokens[ck], title, "AUDIO", genre, age, "ONGOING", False, None, tags)
+        if not sid:
+            continue
+        for n in range(1, tracks + 1):
+            wav = os.path.join(tmp, f"audio-{sid}-{n}.wav")
+            _write_wav(wav, seconds=2.0 + n, freq=330 + 60 * n)
+            upload_media_episode(tokens[ck], sid, f"{n}번 트랙", wav, "audio/wav")
+        created.append((sid, "AUDIO", title))
 
     print("• 단일물(일러/사진/디자인/손그림) …")
     for title, ck, ct, genre, age, imgn, tags in SINGLES:
@@ -284,10 +345,12 @@ def main():
         subscribe(reader, sid)                                  # 독자 구독
         upload_episode(author_token, sid, next_title, [pick(pool, sid, 99)])  # 새 회차 → 알림
 
-    print("• 커버 백필(cover_url ← 회차1 첫 이미지) …")
+    print("• 커버 백필(cover_url ← 회차1 첫 이미지, 이미지 타입만) …")
+    # 소설(TEXT)·음악(AUDIO)은 회차1 자산이 .png가 아니라 커버 대상에서 제외 → 프론트 placeholder.
     psql("UPDATE series SET cover_url = '/files/' || id || '/1/0.png' "
-         "WHERE cover_url IS NULL AND EXISTS "
-         "(SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.episode_no = 1);")
+         "WHERE cover_url IS NULL "
+         "AND content_type IN ('WEBTOON','ILLUSTRATION','DESIGN','PHOTO','DRAWING') "
+         "AND EXISTS (SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.episode_no = 1);")
 
     print("• publish_at 스태거 백필('최근 업데이트' 정렬이 의미를 갖도록) …")
     # 시리즈마다 기준 시각을 다르게(id 작을수록 과거), 회차번호 클수록 최근.
