@@ -92,7 +92,8 @@ class EpisodeViewerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.hasNext").value(true))
-                .andExpect(jsonPath("$.content[0].episodeNo").value(1));
+                // 최신순(내림차순) → 첫 페이지 첫 항목은 최신 회차(3화).
+                .andExpect(jsonPath("$.content[0].episodeNo").value(3));
     }
 
     @Test

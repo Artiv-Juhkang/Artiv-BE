@@ -25,7 +25,7 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
 
     Optional<Episode> findBySeriesIdAndEpisodeNo(Long seriesId, int episodeNo);
 
-    Slice<Episode> findBySeriesIdAndStatusOrderByEpisodeNoAsc(Long seriesId, EpisodeStatus status, Pageable pageable);
+    Slice<Episode> findBySeriesIdAndStatusOrderByEpisodeNoDesc(Long seriesId, EpisodeStatus status, Pageable pageable);
 
     List<Episode> findByStatusAndPublishAtLessThanEqual(EpisodeStatus status, Instant time);
 

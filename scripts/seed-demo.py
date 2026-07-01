@@ -353,11 +353,26 @@ def main():
          "AND EXISTS (SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.episode_no = 1);")
 
     print("• publish_at 스태거 백필('최근 업데이트' 정렬이 의미를 갖도록) …")
-    # 시리즈마다 기준 시각을 다르게(id 작을수록 과거), 회차번호 클수록 최근.
-    psql("UPDATE episodes SET publish_at = now() "
-         "- ((SELECT count(*) FROM series) - series_id) * interval '1 day' "
-         "+ episode_no * interval '2 hour' "
-         "WHERE status = 'PUBLISHED';")
+    # 각 시리즈의 '최신 회차'를 앵커로 과거 방향으로만 스태거한다(미래 발행 금지):
+    #   - 시리즈 간: id 작을수록 최근(8h 간격). 시드가 웹툰을 먼저 만들므로 낮은 id=웹툰 →
+    #     장수 웹툰이 '최근 업데이트' 상위에 오고 상위 3편만 24h 이내라 작품 UP가 붙는다(현실적).
+    #   - 시리즈 내: episode_no 클수록 최근(최신 회차=앵커, 이전 회차는 2일씩 과거) →
+    #     한 작품에서 최신 1편만 24h 이내라 '회차 UP'가 새 회차에만 붙는다.
+    psql("UPDATE episodes e SET publish_at = now() "
+         "- (e.series_id - (SELECT min(id) FROM series)) * interval '8 hour' "
+         "- (m.maxno - e.episode_no) * interval '2 day' "
+         "FROM (SELECT series_id AS sid, max(episode_no) AS maxno FROM episodes "
+         "      WHERE status = 'PUBLISHED' GROUP BY series_id) m "
+         "WHERE e.series_id = m.sid AND e.status = 'PUBLISHED';")
+
+    print("• last_published_at 재동기화(비정규화 필드 ← 실제 최신 발행 회차) …")
+    # UP 배지·'최근 업데이트' 정렬이 쓰는 series.last_published_at을 백필된 회차 시각과 맞춘다.
+    # (시드가 회차를 API로 만든 뒤 publish_at만 SQL로 백데이트해 이 필드가 시드 실행 시각에 고정돼
+    #  전 작품이 UP로 보이던 결함을 바로잡는다.)
+    psql("UPDATE series s SET last_published_at = sub.mx "
+         "FROM (SELECT series_id AS sid, max(publish_at) AS mx FROM episodes "
+         "      WHERE status = 'PUBLISHED' GROUP BY series_id) sub "
+         "WHERE s.id = sub.sid;")
 
     print("\n완료. 시리즈 %d편 시드(요일 분산 웹툰 + 매체별 단일물 + 소설)." % len(created))
     print("검증: 창작물 '전체' 레일 / 웹툰 요일탭(요일마다 다른 작품) / 단일물 갤러리 / 19금 게이트 / 알림.")

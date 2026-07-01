@@ -127,8 +127,9 @@ public class EpisodeService {
         boolean canPreview = isAdmin || series.isAuthoredBy(viewerId);
         Instant now = Instant.now();
         // 목록은 PUBLISHED만 조회 → publishAt non-null 보장(쿼리를 PUBLISHED+SCHEDULED로 바꾸면 evaluate 재검토 필요).
+        // 최신 회차부터 내림차순(프론트 회차 목록 기본이 '최신화부터' — 새 회차/UP가 최상단).
         Slice<EpisodeSummaryResponse> slice = episodeRepository
-                .findBySeriesIdAndStatusOrderByEpisodeNoAsc(seriesId, EpisodeStatus.PUBLISHED, pageable)
+                .findBySeriesIdAndStatusOrderByEpisodeNoDesc(seriesId, EpisodeStatus.PUBLISHED, pageable)
                 .map(ep -> EpisodeSummaryResponse.of(ep, episodeAccessEvaluator.evaluate(series, ep, viewerId, canPreview, now)));
         return SliceResponse.from(slice);
     }
