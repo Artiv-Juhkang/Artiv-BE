@@ -550,6 +550,44 @@
         }
       }
     },
+    "/api/series/{seriesId}/episodes/{episodeNo}/comments/{commentId}/like" : {
+      "post" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "like_1",
+        "parameters" : [ {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "201" : {
+            "description" : "Created"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "comment-controller" ],
+        "operationId" : "unlike_1",
+        "parameters" : [ {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        }
+      }
+    },
     "/api/series/{seriesId}/episodes/{episodeNo}/bookmark" : {
       "post" : {
         "tags" : [ "personalization-controller" ],
@@ -836,7 +874,7 @@
     "/api/posts/{id}/like" : {
       "post" : {
         "tags" : [ "post-controller" ],
-        "operationId" : "like_1",
+        "operationId" : "like_2",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -854,7 +892,7 @@
       },
       "delete" : {
         "tags" : [ "post-controller" ],
-        "operationId" : "unlike_1",
+        "operationId" : "unlike_2",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -2218,6 +2256,36 @@
         }
       }
     },
+    "/api/authors/{authorId}/series" : {
+      "get" : {
+        "tags" : [ "author-controller" ],
+        "operationId" : "authorSeries",
+        "parameters" : [ {
+          "name" : "authorId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SeriesSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/authors/{authorId}/posts" : {
       "get" : {
         "tags" : [ "author-controller" ],
@@ -2793,6 +2861,10 @@
             "type" : "string",
             "maxLength" : 1000,
             "minLength" : 0
+          },
+          "parentId" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "content" ]
@@ -3598,6 +3670,10 @@
           "liked" : {
             "type" : "boolean"
           },
+          "commentCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "locked" : {
             "type" : "boolean"
           },
@@ -3649,6 +3725,10 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "parentId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "content" : {
             "type" : "string"
           },
@@ -3658,6 +3738,19 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "likeCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "liked" : {
+            "type" : "boolean"
+          },
+          "replies" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommentResponse"
+            }
           }
         }
       },
@@ -3703,6 +3796,10 @@
           },
           "description" : {
             "type" : "string"
+          },
+          "authorId" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "authorNickname" : {
             "type" : "string"
