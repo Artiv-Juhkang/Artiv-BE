@@ -103,13 +103,17 @@ public class EpisodeService {
                 });
     }
 
-    /** 시리즈 구독자에게 새 회차 알림(작가 본인 제외). dedup_key=회차 PK라 발행 경로 중복돼도 멱등. */
+    /**
+     * 시리즈 구독자에게 새 회차 알림(작가 본인 제외). dedup_key=회차 PK라 발행 경로 중복돼도 멱등.
+     * 목적지는 작품 상세(targetType=SERIES, targetId=시리즈 id) — 프론트가 상세로 딥링크해 새 회차를
+     * 바로 볼 수 있게 한다(회차 뷰어는 seriesId+episodeNo 둘 다 필요해 단일 targetId로 직행 불가).
+     */
     private void notifySubscribers(Series series, Episode episode) {
         Long authorId = series.getAuthor().getId();
         List<Long> recipients = subscriptionRepository.findSubscriberIdsBySeriesId(series.getId()).stream()
                 .filter(id -> !id.equals(authorId)).toList();
-        notificationService.fanOut(recipients, NotificationType.EPISODE_PUBLISHED, NotificationTargetType.EPISODE,
-                episode.getId(), null, "새 회차",
+        notificationService.fanOut(recipients, NotificationType.EPISODE_PUBLISHED, NotificationTargetType.SERIES,
+                series.getId(), null, "새 회차",
                 "구독작 '" + series.getTitle() + "' " + episode.getEpisodeNo() + "화가 올라왔어요.",
                 rid -> "EP_PUB:" + episode.getId());
     }

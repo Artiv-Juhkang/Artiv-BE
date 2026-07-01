@@ -180,7 +180,7 @@ class NotificationTriggerTest {
         Series series = seriesRepository.save(Series.create("연재작", "설명", author,
                 AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY)));
         subscriptionRepository.save(Subscription.create(subscriber, series));
-        Episode ep = episodeRepository.save(Episode.create(series, 1, "1화",
+        episodeRepository.save(Episode.create(series, 1, "1화",
                 EpisodeStatus.SCHEDULED, Instant.now().minusSeconds(60)));
 
         episodeService.publishDueEpisodes(Instant.now());
@@ -188,8 +188,9 @@ class NotificationTriggerTest {
         List<Notification> sub = notis(subscriberId);
         assertThat(sub).hasSize(1);
         assertThat(sub.get(0).getType()).isEqualTo(NotificationType.EPISODE_PUBLISHED);
-        assertThat(sub.get(0).getTargetType()).isEqualTo(NotificationTargetType.EPISODE);
-        assertThat(sub.get(0).getTargetId()).isEqualTo(ep.getId());
+        // 목적지는 작품 상세(SERIES) — 프론트가 상세로 딥링크해 새 회차를 바로 볼 수 있다.
+        assertThat(sub.get(0).getTargetType()).isEqualTo(NotificationTargetType.SERIES);
+        assertThat(sub.get(0).getTargetId()).isEqualTo(series.getId());
         assertThat(notis(nonSubId)).isEmpty();
         assertThat(notis(authorId)).isEmpty(); // 작가 자신 제외(구독 안 함)
     }
