@@ -42,6 +42,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostImageRepository postImageRepository;
     private final PostLikeRepository postLikeRepository;
+    private final PostDislikeRepository postDislikeRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
     private final NotificationService notificationService;
@@ -84,7 +85,7 @@ public class PostService {
         Page<Post> page = postRepository.findVisible(category, sorted);
         Map<Long, String> names = nicknames(page.getContent());
         return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
-                names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt())));
+                names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getDislikeCount(), p.getCreatedAt())));
     }
 
     public PostDetailResponse getDetail(Long id, Long viewerId, boolean isAdmin) {
@@ -97,8 +98,9 @@ public class PostService {
                         im.getWidth(), im.getHeight(), im.getSortOrder()))
                 .toList();
         boolean liked = postLikeRepository.existsByUserIdAndPostId(viewerId, id);
+        boolean disliked = postDislikeRepository.existsByUserIdAndPostId(viewerId, id);
         return new PostDetailResponse(post.getId(), post.getAuthorId(), post.getCategory(), post.getTitle(), post.getContent(),
-                nickname(post.getAuthorId()), post.getLikeCount(), liked, images, post.getCreatedAt());
+                nickname(post.getAuthorId()), post.getLikeCount(), liked, post.getDislikeCount(), disliked, images, post.getCreatedAt());
     }
 
     /**
@@ -141,8 +143,40 @@ public class PostService {
         if (postLikeRepository.existsByUserIdAndPostId(userId, id)) {
             return; // 멱등
         }
+        if (postDislikeRepository.existsByUserIdAndPostId(userId, id)) {
+            postDislikeRepository.deleteByUserIdAndPostId(userId, id); // 추천↔비추천 상호배타
+            post.decreaseDislike();
+        }
         postLikeRepository.save(PostLike.create(userId, id));
         post.increaseLike();
+    }
+
+    /** 비추천(멱등) — 추천 중이었다면 자동 해제(상호배타). */
+    @Transactional
+    public void dislike(Long userId, Long id) {
+        Post post = load(id);
+        if (post.isBlinded()) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+        if (postDislikeRepository.existsByUserIdAndPostId(userId, id)) {
+            return; // 멱등
+        }
+        if (postLikeRepository.existsByUserIdAndPostId(userId, id)) {
+            postLikeRepository.deleteByUserIdAndPostId(userId, id);
+            post.decreaseLike();
+        }
+        postDislikeRepository.save(PostDislike.create(userId, id));
+        post.increaseDislike();
+    }
+
+    /** 비추천 취소(멱등). */
+    @Transactional
+    public void undislike(Long userId, Long id) {
+        Post post = load(id);
+        if (postDislikeRepository.existsByUserIdAndPostId(userId, id)) {
+            postDislikeRepository.deleteByUserIdAndPostId(userId, id);
+            post.decreaseDislike();
+        }
     }
 
     @Transactional
@@ -200,7 +234,7 @@ public class PostService {
         Map<Long, String> names = nicknames(posts);
         List<PostResponse> content = posts.stream()
                 .map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
-                        names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt()))
+                        names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getDislikeCount(), p.getCreatedAt()))
                 .toList();
         return new PageResponse<>(content, likes.getNumber(), likes.getSize(),
                 likes.getTotalElements(), likes.getTotalPages(), likes.isLast());
@@ -220,7 +254,7 @@ public class PostService {
     private PageResponse<PostResponse> toPostResponses(Page<Post> page) {
         Map<Long, String> names = nicknames(page.getContent());
         return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
-                names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt())));
+                names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getDislikeCount(), p.getCreatedAt())));
     }
 
     private Post load(Long id) {

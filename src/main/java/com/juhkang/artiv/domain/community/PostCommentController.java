@@ -38,8 +38,28 @@ public class PostCommentController {
     }
 
     @GetMapping
-    public List<PostCommentResponse> list(@PathVariable Long postId) {
-        return postCommentService.getComments(postId);
+    public List<PostCommentResponse> list(@AuthenticationPrincipal Long userId, @PathVariable Long postId) {
+        return postCommentService.getComments(postId, userId);
+    }
+
+    @PostMapping("/{commentId}/like")
+    public void like(@AuthenticationPrincipal Long userId, @PathVariable Long postId, @PathVariable Long commentId) {
+        postCommentService.like(userId, postId, commentId);
+    }
+
+    @DeleteMapping("/{commentId}/like")
+    public void unlike(@AuthenticationPrincipal Long userId, @PathVariable Long postId, @PathVariable Long commentId) {
+        postCommentService.unlike(userId, postId, commentId);
+    }
+
+    @PostMapping("/{commentId}/dislike")
+    public void dislike(@AuthenticationPrincipal Long userId, @PathVariable Long postId, @PathVariable Long commentId) {
+        postCommentService.dislike(userId, postId, commentId);
+    }
+
+    @DeleteMapping("/{commentId}/dislike")
+    public void undislike(@AuthenticationPrincipal Long userId, @PathVariable Long postId, @PathVariable Long commentId) {
+        postCommentService.undislike(userId, postId, commentId);
     }
 
     @DeleteMapping("/{commentId}")

@@ -82,4 +82,14 @@ public class PostController {
     public void unlike(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
         postService.unlike(userId, id);
     }
+
+    @PostMapping("/{id}/dislike")
+    public void dislike(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        postService.dislike(userId, id);
+    }
+
+    @DeleteMapping("/{id}/dislike")
+    public void undislike(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        postService.undislike(userId, id);
+    }
 }

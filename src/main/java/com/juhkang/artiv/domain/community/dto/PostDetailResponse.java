@@ -15,6 +15,8 @@ public record PostDetailResponse(
         String authorNickname,
         int likeCount,
         boolean liked,
+        int dislikeCount,
+        boolean disliked,
         List<PostImageResponse> images,
         Instant createdAt
 ) {

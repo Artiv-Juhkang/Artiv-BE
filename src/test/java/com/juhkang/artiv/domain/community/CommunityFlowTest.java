@@ -144,6 +144,89 @@ class CommunityFlowTest {
     }
 
     @Test
+    void 추천과_비추천은_상호배타_멱등이다() throws Exception {
+        long id = createPost(readerToken, "FREE", "평가해주세요");
+
+        // 추천 → likeCount 1
+        mockMvc.perform(post("/api/posts/" + id + "/like").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk());
+
+        // 비추천 2회(멱등) → 추천 자동 해제 + dislikeCount 1
+        mockMvc.perform(post("/api/posts/" + id + "/dislike").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/posts/" + id + "/dislike").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.likeCount").value(0))
+                .andExpect(jsonPath("$.liked").value(false))
+                .andExpect(jsonPath("$.dislikeCount").value(1))
+                .andExpect(jsonPath("$.disliked").value(true));
+
+        // 다시 추천 → 비추천 자동 해제
+        mockMvc.perform(post("/api/posts/" + id + "/like").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.likeCount").value(1))
+                .andExpect(jsonPath("$.dislikeCount").value(0))
+                .andExpect(jsonPath("$.disliked").value(false));
+
+        // 비추천 취소(DELETE)도 멱등
+        mockMvc.perform(delete("/api/posts/" + id + "/dislike").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.likeCount").value(1))
+                .andExpect(jsonPath("$.dislikeCount").value(0));
+
+        // 목록에도 dislikeCount 노출
+        mockMvc.perform(get("/api/posts").header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.content[0].dislikeCount").value(0));
+    }
+
+    @Test
+    void 댓글_좋아요와_싫어요는_상호배타_멱등이다() throws Exception {
+        long postId = createPost(readerToken, "FREE", "댓글 평가");
+        String body = mockMvc.perform(post("/api/posts/" + postId + "/comments")
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"제 의견은요\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long commentId = ((Number) JsonPath.read(body, "$.id")).longValue();
+        String base = "/api/posts/" + postId + "/comments/" + commentId;
+
+        // 좋아요 2회(멱등) → likeCount 1, 내(reader) 시점 liked true
+        mockMvc.perform(post(base + "/like").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base + "/like").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$[0].likeCount").value(1))
+                .andExpect(jsonPath("$[0].liked").value(true))
+                .andExpect(jsonPath("$[0].dislikeCount").value(0))
+                .andExpect(jsonPath("$[0].disliked").value(false));
+
+        // 싫어요 → 좋아요 자동 해제
+        mockMvc.perform(post(base + "/dislike").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$[0].likeCount").value(0))
+                .andExpect(jsonPath("$[0].liked").value(false))
+                .andExpect(jsonPath("$[0].dislikeCount").value(1))
+                .andExpect(jsonPath("$[0].disliked").value(true));
+
+        // 다른 게시글 경로로는 대상 불일치 → 404
+        long otherPost = createPost(readerToken, "FREE", "다른 글");
+        mockMvc.perform(post("/api/posts/" + otherPost + "/comments/" + commentId + "/like")
+                        .header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isNotFound());
+
+        // 싫어요 취소
+        mockMvc.perform(delete(base + "/dislike").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$[0].dislikeCount").value(0));
+    }
+
+    @Test
     void 글_수정은_작성자만_텍스트_필드를_고친다() throws Exception {
         long id = createPost(readerToken, "FREE", "원래 제목");
 

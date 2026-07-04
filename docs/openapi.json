@@ -871,10 +871,118 @@
         }
       }
     },
+    "/api/posts/{postId}/comments/{commentId}/like" : {
+      "post" : {
+        "tags" : [ "post-comment-controller" ],
+        "operationId" : "like_2",
+        "parameters" : [ {
+          "name" : "postId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "post-comment-controller" ],
+        "operationId" : "unlike_2",
+        "parameters" : [ {
+          "name" : "postId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/posts/{postId}/comments/{commentId}/dislike" : {
+      "post" : {
+        "tags" : [ "post-comment-controller" ],
+        "operationId" : "dislike",
+        "parameters" : [ {
+          "name" : "postId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "post-comment-controller" ],
+        "operationId" : "undislike",
+        "parameters" : [ {
+          "name" : "postId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
     "/api/posts/{id}/like" : {
       "post" : {
         "tags" : [ "post-controller" ],
-        "operationId" : "like_2",
+        "operationId" : "like_3",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -892,7 +1000,45 @@
       },
       "delete" : {
         "tags" : [ "post-controller" ],
-        "operationId" : "unlike_2",
+        "operationId" : "unlike_3",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/dislike" : {
+      "post" : {
+        "tags" : [ "post-controller" ],
+        "operationId" : "dislike_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "post-controller" ],
+        "operationId" : "undislike_1",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -2955,6 +3101,20 @@
           "content" : {
             "type" : "string"
           },
+          "likeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "liked" : {
+            "type" : "boolean"
+          },
+          "dislikeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "disliked" : {
+            "type" : "boolean"
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -3981,6 +4141,10 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "dislikeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -4016,6 +4180,13 @@
             "format" : "int32"
           },
           "liked" : {
+            "type" : "boolean"
+          },
+          "dislikeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "disliked" : {
             "type" : "boolean"
           },
           "images" : {

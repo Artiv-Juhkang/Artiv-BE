@@ -9,6 +9,10 @@ public record PostCommentResponse(
         Long authorId,
         String authorNickname,
         String content,
+        int likeCount,
+        boolean liked,
+        int dislikeCount,
+        boolean disliked,
         Instant createdAt,
         List<PostCommentResponse> replies
 ) {

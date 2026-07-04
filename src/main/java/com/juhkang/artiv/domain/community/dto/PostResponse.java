@@ -12,6 +12,7 @@ public record PostResponse(
         String title,
         String authorNickname,
         int likeCount,
+        int dislikeCount,
         Instant createdAt
 ) {
 }

@@ -31,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 public class PostCommentService {
 
     private final PostCommentRepository postCommentRepository;
+    private final PostCommentLikeRepository postCommentLikeRepository;
+    private final PostCommentDislikeRepository postCommentDislikeRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -59,7 +61,7 @@ public class PostCommentService {
                     "회원님의 댓글에 답글이 달렸어요.", rid -> "CMT_REPLY:" + saved.getId());
         }
         notifyMentions(content, userId, postId, saved.getId());  // ④ 댓글 본문 멘션
-        return new PostCommentResponse(saved.getId(), userId, nickname(userId), saved.getContent(), saved.getCreatedAt(), List.of());
+        return new PostCommentResponse(saved.getId(), userId, nickname(userId), saved.getContent(), 0, false, 0, false, saved.getCreatedAt(), List.of());
     }
 
     /** 댓글 본문 @닉네임 → 언급된 사용자에게 POST_MENTIONED(작성자 본인 제외). */
@@ -92,8 +94,15 @@ public class PostCommentService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
-    public List<PostCommentResponse> getComments(Long postId) {
+    public List<PostCommentResponse> getComments(Long postId, Long viewerId) {
         List<PostComment> all = postCommentRepository.findByPostIdAndBlindedFalseOrderByIdAsc(postId);
+        List<Long> commentIds = all.stream().map(PostComment::getId).toList();
+        Set<Long> likedIds = commentIds.isEmpty() ? Set.of()
+                : postCommentLikeRepository.findByUserIdAndCommentIdIn(viewerId, commentIds).stream()
+                        .map(PostCommentLike::getCommentId).collect(Collectors.toSet());
+        Set<Long> dislikedIds = commentIds.isEmpty() ? Set.of()
+                : postCommentDislikeRepository.findByUserIdAndCommentIdIn(viewerId, commentIds).stream()
+                        .map(PostCommentDislike::getCommentId).collect(Collectors.toSet());
         Map<Long, String> names = userRepository.findAllById(all.stream().map(PostComment::getAuthorId).distinct().toList())
                 .stream().collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
         Map<Long, List<PostComment>> repliesByParent = all.stream()
@@ -101,7 +110,7 @@ public class PostCommentService {
                 .collect(Collectors.groupingBy(PostComment::getParentId));
         return all.stream()
                 .filter(c -> c.getParentId() == null)
-                .map(top -> toResponse(top, names, repliesByParent.getOrDefault(top.getId(), List.of())))
+                .map(top -> toResponse(top, names, repliesByParent.getOrDefault(top.getId(), List.of()), likedIds, dislikedIds))
                 .toList();
     }
 
@@ -137,13 +146,74 @@ public class PostCommentService {
         return new ParentRef(parent.getId(), parent.getAuthorId());
     }
 
-    private PostCommentResponse toResponse(PostComment c, Map<Long, String> names, List<PostComment> replies) {
+    private PostCommentResponse toResponse(PostComment c, Map<Long, String> names, List<PostComment> replies,
+                                           Set<Long> likedIds, Set<Long> dislikedIds) {
         List<PostCommentResponse> replyDtos = replies.stream()
                 .map(r -> new PostCommentResponse(r.getId(), r.getAuthorId(), names.getOrDefault(r.getAuthorId(), "(탈퇴)"),
-                        r.getContent(), r.getCreatedAt(), List.of()))
+                        r.getContent(), r.getLikeCount(), likedIds.contains(r.getId()),
+                        r.getDislikeCount(), dislikedIds.contains(r.getId()), r.getCreatedAt(), List.of()))
                 .toList();
         return new PostCommentResponse(c.getId(), c.getAuthorId(), names.getOrDefault(c.getAuthorId(), "(탈퇴)"),
-                c.getContent(), c.getCreatedAt(), replyDtos);
+                c.getContent(), c.getLikeCount(), likedIds.contains(c.getId()),
+                c.getDislikeCount(), dislikedIds.contains(c.getId()), c.getCreatedAt(), replyDtos);
+    }
+
+    /** 댓글 좋아요(멱등) — 싫어요 중이었다면 자동 해제(상호배타). */
+    @Transactional
+    public void like(Long userId, Long postId, Long commentId) {
+        PostComment comment = loadForReaction(postId, commentId);
+        if (postCommentLikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            return; // 멱등
+        }
+        if (postCommentDislikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            postCommentDislikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+            comment.decreaseDislike();
+        }
+        postCommentLikeRepository.save(PostCommentLike.create(userId, commentId));
+        comment.increaseLike();
+    }
+
+    @Transactional
+    public void unlike(Long userId, Long postId, Long commentId) {
+        PostComment comment = loadForReaction(postId, commentId);
+        if (postCommentLikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            postCommentLikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+            comment.decreaseLike();
+        }
+    }
+
+    /** 댓글 싫어요(멱등) — 좋아요 중이었다면 자동 해제(상호배타). */
+    @Transactional
+    public void dislike(Long userId, Long postId, Long commentId) {
+        PostComment comment = loadForReaction(postId, commentId);
+        if (postCommentDislikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            return; // 멱등
+        }
+        if (postCommentLikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            postCommentLikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+            comment.decreaseLike();
+        }
+        postCommentDislikeRepository.save(PostCommentDislike.create(userId, commentId));
+        comment.increaseDislike();
+    }
+
+    @Transactional
+    public void undislike(Long userId, Long postId, Long commentId) {
+        PostComment comment = loadForReaction(postId, commentId);
+        if (postCommentDislikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+            postCommentDislikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+            comment.decreaseDislike();
+        }
+    }
+
+    /** 반응 대상 로드 — 경로의 postId와 실제 소속 불일치·블라인드는 존재를 숨긴다(404). */
+    private PostComment loadForReaction(Long postId, Long commentId) {
+        PostComment comment = postCommentRepository.findById(commentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!comment.getPostId().equals(postId) || comment.isBlinded()) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+        return comment;
     }
 
     private String nickname(Long userId) {

@@ -35,6 +35,12 @@ public class PostComment extends BaseEntity {
     @Column(nullable = false, length = 1000)
     private String content;
 
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
+
+    @Column(name = "dislike_count", nullable = false)
+    private int dislikeCount;
+
     @Column(nullable = false)
     private boolean blinded;
 
@@ -61,6 +67,22 @@ public class PostComment extends BaseEntity {
 
     public boolean isReply() {
         return parentId != null;
+    }
+
+    public void increaseLike() {
+        this.likeCount++;
+    }
+
+    public void decreaseLike() {
+        if (likeCount > 0) this.likeCount--;
+    }
+
+    public void increaseDislike() {
+        this.dislikeCount++;
+    }
+
+    public void decreaseDislike() {
+        if (dislikeCount > 0) this.dislikeCount--;
     }
 
     public void blind(Long byUserId) {
