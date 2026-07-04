@@ -8,6 +8,7 @@ import com.juhkang.artiv.domain.community.PostCategory;
 /** 게시글 상세. */
 public record PostDetailResponse(
         Long id,
+        Long authorId,
         PostCategory category,
         String title,
         String content,

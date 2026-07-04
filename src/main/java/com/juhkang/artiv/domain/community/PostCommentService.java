@@ -59,7 +59,7 @@ public class PostCommentService {
                     "회원님의 댓글에 답글이 달렸어요.", rid -> "CMT_REPLY:" + saved.getId());
         }
         notifyMentions(content, userId, postId, saved.getId());  // ④ 댓글 본문 멘션
-        return new PostCommentResponse(saved.getId(), nickname(userId), saved.getContent(), saved.getCreatedAt(), List.of());
+        return new PostCommentResponse(saved.getId(), userId, nickname(userId), saved.getContent(), saved.getCreatedAt(), List.of());
     }
 
     /** 댓글 본문 @닉네임 → 언급된 사용자에게 POST_MENTIONED(작성자 본인 제외). */
@@ -139,10 +139,10 @@ public class PostCommentService {
 
     private PostCommentResponse toResponse(PostComment c, Map<Long, String> names, List<PostComment> replies) {
         List<PostCommentResponse> replyDtos = replies.stream()
-                .map(r -> new PostCommentResponse(r.getId(), names.getOrDefault(r.getAuthorId(), "(탈퇴)"),
+                .map(r -> new PostCommentResponse(r.getId(), r.getAuthorId(), names.getOrDefault(r.getAuthorId(), "(탈퇴)"),
                         r.getContent(), r.getCreatedAt(), List.of()))
                 .toList();
-        return new PostCommentResponse(c.getId(), names.getOrDefault(c.getAuthorId(), "(탈퇴)"),
+        return new PostCommentResponse(c.getId(), c.getAuthorId(), names.getOrDefault(c.getAuthorId(), "(탈퇴)"),
                 c.getContent(), c.getCreatedAt(), replyDtos);
     }
 

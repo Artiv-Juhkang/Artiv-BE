@@ -83,7 +83,7 @@ public class PostService {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort());
         Page<Post> page = postRepository.findVisible(category, sorted);
         Map<Long, String> names = nicknames(page.getContent());
-        return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getCategory(), p.getTitle(),
+        return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
                 names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt())));
     }
 
@@ -97,7 +97,7 @@ public class PostService {
                         im.getWidth(), im.getHeight(), im.getSortOrder()))
                 .toList();
         boolean liked = postLikeRepository.existsByUserIdAndPostId(viewerId, id);
-        return new PostDetailResponse(post.getId(), post.getCategory(), post.getTitle(), post.getContent(),
+        return new PostDetailResponse(post.getId(), post.getAuthorId(), post.getCategory(), post.getTitle(), post.getContent(),
                 nickname(post.getAuthorId()), post.getLikeCount(), liked, images, post.getCreatedAt());
     }
 
@@ -179,7 +179,7 @@ public class PostService {
                 .filter(p -> p != null && !p.isBlinded()).toList();   // 삭제·블라인드 제외, 좋아요순 보존
         Map<Long, String> names = nicknames(posts);
         List<PostResponse> content = posts.stream()
-                .map(p -> new PostResponse(p.getId(), p.getCategory(), p.getTitle(),
+                .map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
                         names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt()))
                 .toList();
         return new PageResponse<>(content, likes.getNumber(), likes.getSize(),
@@ -199,7 +199,7 @@ public class PostService {
     /** Page<Post> → PageResponse<PostResponse>(작성자 닉네임 배치, N+1 없음). */
     private PageResponse<PostResponse> toPostResponses(Page<Post> page) {
         Map<Long, String> names = nicknames(page.getContent());
-        return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getCategory(), p.getTitle(),
+        return PageResponse.from(page.map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getCategory(), p.getTitle(),
                 names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.getCreatedAt())));
     }
 

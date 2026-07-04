@@ -49,12 +49,16 @@ class CommunityFlowTest {
     private String readerToken;
     private String otherToken;
     private String adminToken;
+    private long readerId;
+    private long otherId;
 
     @BeforeEach
     void setUp() {
         User reader = userRepository.save(User.create("reader@test.com", passwordEncoder.encode("password123"), "독자", Role.READER, ADULT));
         User other = userRepository.save(User.create("other@test.com", passwordEncoder.encode("password123"), "다른독자", Role.READER, ADULT));
         User admin = userRepository.save(User.create("admin@test.com", passwordEncoder.encode("password123"), "관리자", Role.ADMIN, ADULT));
+        readerId = reader.getId();
+        otherId = other.getId();
         readerToken = jwtProvider.createAccessToken(reader.getId(), Role.READER);
         otherToken = jwtProvider.createAccessToken(other.getId(), Role.READER);
         adminToken = jwtProvider.createAccessToken(admin.getId(), Role.ADMIN);
@@ -84,11 +88,13 @@ class CommunityFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("내가 그린 팬아트"))
-                .andExpect(jsonPath("$.content[0].category").value("FANART"));
+                .andExpect(jsonPath("$.content[0].category").value("FANART"))
+                .andExpect(jsonPath("$.content[0].authorId").value((int) readerId));
 
         mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").value("본문입니다"))
+                .andExpect(jsonPath("$.authorId").value((int) readerId))
                 .andExpect(jsonPath("$.likeCount").value(0))
                 .andExpect(jsonPath("$.liked").value(false))
                 .andExpect(jsonPath("$.images.length()").value(1));
@@ -129,8 +135,10 @@ class CommunityFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].content").value("좋은 글이네요"))
+                .andExpect(jsonPath("$[0].authorId").value((int) otherId))
                 .andExpect(jsonPath("$[0].replies.length()").value(1))
-                .andExpect(jsonPath("$[0].replies[0].content").value("감사합니다"));
+                .andExpect(jsonPath("$[0].replies[0].content").value("감사합니다"))
+                .andExpect(jsonPath("$[0].replies[0].authorId").value((int) readerId));
     }
 
     @Test
