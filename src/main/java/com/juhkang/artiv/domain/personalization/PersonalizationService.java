@@ -99,36 +99,34 @@ public class PersonalizationService {
         bookmarkRepository.deleteByUserIdAndEpisodeId(userId, episode.getId());
     }
 
-    public List<BookmarkResponse> getMyBookmarks(Long userId) {
-        return bookmarkRepository.findByUserIdWithEpisode(userId).stream()
-                .map(BookmarkResponse::of)
-                .toList();
+    /** 내 북마크(최신순 Page). 정렬 고정(클라 sort 무시) — read-history와 동일 계약. */
+    public PageResponse<BookmarkResponse> getMyBookmarks(Long userId, Pageable pageable) {
+        return PageResponse.from(
+                bookmarkRepository.findByUserIdWithEpisode(userId, Pageables.pageOnly(pageable))
+                        .map(BookmarkResponse::of));
     }
 
-    public List<SubscriptionResponse> getMySubscriptions(Long userId) {
-        List<Subscription> subscriptions = subscriptionRepository.findByUserIdWithSeries(userId);
-        if (subscriptions.isEmpty()) {
-            return List.of();
-        }
-        List<Long> seriesIds = subscriptions.stream().map(s -> s.getSeries().getId()).toList();
+    /** 내 구독(최신순 Page). 정렬 고정(클라 sort 무시) — read-history와 동일 계약. */
+    public PageResponse<SubscriptionResponse> getMySubscriptions(Long userId, Pageable pageable) {
+        Page<Subscription> page = subscriptionRepository
+                .findByUserIdWithSeries(userId, Pageables.pageOnly(pageable));
+        List<Long> seriesIds = page.getContent().stream().map(s -> s.getSeries().getId()).toList();
 
         // 작품별 (최신 발행 회차번호)·(내가 마지막으로 읽은 회차번호)을 배치 집계 → N+1 회피
-        Map<Long, Integer> latestNoBySeries = episodeRepository
-                .findMaxEpisodeNoBySeriesIds(seriesIds, EpisodeStatus.PUBLISHED).stream()
-                .collect(Collectors.toMap(SeriesMaxNo::getSeriesId, SeriesMaxNo::getMaxNo));
-        Map<Long, Integer> lastReadNoBySeries = readLogRepository
-                .findMaxReadEpisodeNo(userId, seriesIds).stream()
-                .collect(Collectors.toMap(SeriesMaxNo::getSeriesId, SeriesMaxNo::getMaxNo));
+        Map<Long, Integer> latestNoBySeries = seriesIds.isEmpty() ? Map.of()
+                : episodeRepository.findMaxEpisodeNoBySeriesIds(seriesIds, EpisodeStatus.PUBLISHED).stream()
+                        .collect(Collectors.toMap(SeriesMaxNo::getSeriesId, SeriesMaxNo::getMaxNo));
+        Map<Long, Integer> lastReadNoBySeries = seriesIds.isEmpty() ? Map.of()
+                : readLogRepository.findMaxReadEpisodeNo(userId, seriesIds).stream()
+                        .collect(Collectors.toMap(SeriesMaxNo::getSeriesId, SeriesMaxNo::getMaxNo));
 
-        return subscriptions.stream()
-                .map(subscription -> {
-                    Series series = subscription.getSeries();
-                    int latestNo = latestNoBySeries.getOrDefault(series.getId(), 0);
-                    int lastReadNo = lastReadNoBySeries.getOrDefault(series.getId(), 0);
-                    boolean up = latestNo > lastReadNo; // 최신 발행 회차 > 마지막 읽은 회차 = 새 회차 있음(UP)
-                    return new SubscriptionResponse(series.getId(), series.getTitle(), latestNo, lastReadNo, up);
-                })
-                .toList();
+        return PageResponse.from(page.map(subscription -> {
+            Series series = subscription.getSeries();
+            int latestNo = latestNoBySeries.getOrDefault(series.getId(), 0);
+            int lastReadNo = lastReadNoBySeries.getOrDefault(series.getId(), 0);
+            boolean up = latestNo > lastReadNo; // 최신 발행 회차 > 마지막 읽은 회차 = 새 회차 있음(UP)
+            return new SubscriptionResponse(series.getId(), series.getTitle(), latestNo, lastReadNo, up);
+        }));
     }
 
     /** 열람한 작품(최근 열람순). 작품 제목은 배치 1쿼리로 결합 → 쿼리 2개 고정(N+1 없음). 정렬 고정(클라 sort 무시). */

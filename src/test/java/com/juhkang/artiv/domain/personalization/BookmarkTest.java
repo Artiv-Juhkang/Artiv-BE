@@ -71,7 +71,7 @@ class BookmarkTest {
     private void assertBookmarkCount(int count) throws Exception {
         mockMvc.perform(get("/api/me/bookmarks").header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(count));
+                .andExpect(jsonPath("$.content.length()").value(count));
     }
 
     @Test
@@ -86,9 +86,9 @@ class BookmarkTest {
 
         mockMvc.perform(get("/api/me/bookmarks").header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].seriesTitle").value("북마크작품"))
-                .andExpect(jsonPath("$[0].episodeNo").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].seriesTitle").value("북마크작품"))
+                .andExpect(jsonPath("$.content[0].episodeNo").value(1));
 
         mockMvc.perform(delete(bookmarkUrl).header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isNoContent());

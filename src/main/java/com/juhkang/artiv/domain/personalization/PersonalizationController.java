@@ -1,7 +1,5 @@
 package com.juhkang.artiv.domain.personalization;
 
-import java.util.List;
-
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -47,8 +45,9 @@ public class PersonalizationController {
     }
 
     @GetMapping("/api/me/subscriptions")
-    public List<SubscriptionResponse> mySubscriptions(@AuthenticationPrincipal Long userId) {
-        return personalizationService.getMySubscriptions(userId);
+    public PageResponse<SubscriptionResponse> mySubscriptions(@AuthenticationPrincipal Long userId,
+                                                              @PageableDefault(size = 20) Pageable pageable) {
+        return personalizationService.getMySubscriptions(userId, pageable);
     }
 
     @PostMapping("/api/series/{seriesId}/episodes/{episodeNo}/bookmark")
@@ -68,8 +67,9 @@ public class PersonalizationController {
     }
 
     @GetMapping("/api/me/bookmarks")
-    public List<BookmarkResponse> myBookmarks(@AuthenticationPrincipal Long userId) {
-        return personalizationService.getMyBookmarks(userId);
+    public PageResponse<BookmarkResponse> myBookmarks(@AuthenticationPrincipal Long userId,
+                                                      @PageableDefault(size = 20) Pageable pageable) {
+        return personalizationService.getMyBookmarks(userId, pageable);
     }
 
     @GetMapping("/api/me/read-history")

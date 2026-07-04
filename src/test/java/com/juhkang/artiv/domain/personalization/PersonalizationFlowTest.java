@@ -80,14 +80,16 @@ class PersonalizationFlowTest {
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isCreated());
 
-        // 1화 미열람 → UP
+        // 1화 미열람 → UP (Page 봉투 — read-history와 동일 계약)
         mockMvc.perform(get("/api/me/subscriptions")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].latestEpisodeNo").value(1))
-                .andExpect(jsonPath("$[0].lastReadEpisodeNo").value(0))
-                .andExpect(jsonPath("$[0].up").value(true));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.last").value(true))
+                .andExpect(jsonPath("$.content[0].latestEpisodeNo").value(1))
+                .andExpect(jsonPath("$.content[0].lastReadEpisodeNo").value(0))
+                .andExpect(jsonPath("$.content[0].up").value(true));
 
         // 1화 읽음 → UP 사라짐
         mockMvc.perform(post("/api/series/" + sid + "/episodes/1/read")
@@ -95,15 +97,15 @@ class PersonalizationFlowTest {
                 .andExpect(status().isCreated());
         mockMvc.perform(get("/api/me/subscriptions")
                         .header("Authorization", "Bearer " + readerToken))
-                .andExpect(jsonPath("$[0].lastReadEpisodeNo").value(1))
-                .andExpect(jsonPath("$[0].up").value(false));
+                .andExpect(jsonPath("$.content[0].lastReadEpisodeNo").value(1))
+                .andExpect(jsonPath("$.content[0].up").value(false));
 
         // 2화 발행 → 다시 UP
         episodeRepository.save(Episode.create(series, 2, "2화", EpisodeStatus.PUBLISHED, Instant.now()));
         mockMvc.perform(get("/api/me/subscriptions")
                         .header("Authorization", "Bearer " + readerToken))
-                .andExpect(jsonPath("$[0].latestEpisodeNo").value(2))
-                .andExpect(jsonPath("$[0].up").value(true));
+                .andExpect(jsonPath("$.content[0].latestEpisodeNo").value(2))
+                .andExpect(jsonPath("$.content[0].up").value(true));
 
         // 2화 읽음 → UP 사라짐
         mockMvc.perform(post("/api/series/" + sid + "/episodes/2/read")
@@ -111,7 +113,7 @@ class PersonalizationFlowTest {
                 .andExpect(status().isCreated());
         mockMvc.perform(get("/api/me/subscriptions")
                         .header("Authorization", "Bearer " + readerToken))
-                .andExpect(jsonPath("$[0].up").value(false));
+                .andExpect(jsonPath("$.content[0].up").value(false));
     }
 
     @Test
@@ -128,6 +130,7 @@ class PersonalizationFlowTest {
         mockMvc.perform(get("/api/me/subscriptions")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 }
