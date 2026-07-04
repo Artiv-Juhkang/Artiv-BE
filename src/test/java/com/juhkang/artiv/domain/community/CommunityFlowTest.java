@@ -3,6 +3,8 @@ package com.juhkang.artiv.domain.community;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,6 +141,45 @@ class CommunityFlowTest {
                 .andExpect(jsonPath("$[0].replies.length()").value(1))
                 .andExpect(jsonPath("$[0].replies[0].content").value("감사합니다"))
                 .andExpect(jsonPath("$[0].replies[0].authorId").value((int) readerId));
+    }
+
+    @Test
+    void 글_수정은_작성자만_텍스트_필드를_고친다() throws Exception {
+        long id = createPost(readerToken, "FREE", "원래 제목");
+
+        // 타인 수정 → 403 (삭제와 달리 관리자도 불가 — 모더레이션은 블라인드로)
+        mockMvc.perform(patch("/api/posts/" + id)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"QUESTION\",\"title\":\"탈취 시도\",\"content\":\"본문\"}"))
+                .andExpect(status().isForbidden());
+
+        // 검증 실패(빈 제목) → 400
+        mockMvc.perform(patch("/api/posts/" + id)
+                        .header("Authorization", "Bearer " + readerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"QUESTION\",\"title\":\"  \",\"content\":\"본문\"}"))
+                .andExpect(status().isBadRequest());
+
+        // 작성자 수정 → 204, 상세에 반영
+        mockMvc.perform(patch("/api/posts/" + id)
+                        .header("Authorization", "Bearer " + readerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"QUESTION\",\"title\":\"고친 제목\",\"content\":\"@다른독자 고친 본문\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + readerToken))
+                .andExpect(jsonPath("$.title").value("고친 제목"))
+                .andExpect(jsonPath("$.category").value("QUESTION"))
+                .andExpect(jsonPath("$.content").value("@다른독자 고친 본문"));
+
+        // 같은 멘션으로 재수정해도 dedupKey(POST_MENTION:{postId}:{rid})가 중복 알림을 억제한다
+        mockMvc.perform(patch("/api/posts/" + id)
+                        .header("Authorization", "Bearer " + readerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"QUESTION\",\"title\":\"고친 제목2\",\"content\":\"@다른독자 또 고침\"}"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/me/notifications").header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.content[?(@.type == 'POST_MENTIONED')]", hasSize(1)));
     }
 
     @Test

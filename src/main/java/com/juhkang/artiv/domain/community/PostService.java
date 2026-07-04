@@ -101,6 +101,26 @@ public class PostService {
                 nickname(post.getAuthorId()), post.getLikeCount(), liked, images, post.getCreatedAt());
     }
 
+    /**
+     * 게시글 수정 — 작성자 전용(관리자는 블라인드로 모더레이션, 삭제와 달리 수정 권한 없음).
+     * 검증은 작성과 동일 규칙(텍스트만). 멘션 재발송은 dedupKey(POST_MENTION:{postId}:{rid})가
+     * 기발송 수신자를 억제하므로 새로 추가된 멘션에만 알림이 간다.
+     */
+    @Transactional
+    public void update(Long userId, Long id, PostCategory category, String title, String content) {
+        if (category == null || title == null || title.isBlank() || title.strip().length() > 255
+                || content == null || content.isBlank() || content.strip().length() > 5000) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+        Post post = load(id);
+        if (!post.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        post.update(category, title.strip(), content.strip());
+        notifyMentions(content.strip(), userId, post.getId(),
+                "회원님이 게시글 '" + post.getTitle() + "'에서 언급됐어요.", "POST_MENTION:" + post.getId());
+    }
+
     @Transactional
     public void delete(Long userId, boolean isAdmin, Long id) {
         Post post = load(id);

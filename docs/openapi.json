@@ -1277,6 +1277,79 @@
         }
       }
     },
+    "/api/posts/{id}" : {
+      "get" : {
+        "tags" : [ "post-controller" ],
+        "operationId" : "detail",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PostDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "post-controller" ],
+        "operationId" : "delete",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "post-controller" ],
+        "operationId" : "update_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PostUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        }
+      }
+    },
     "/api/me/notifications/{notificationId}/read" : {
       "patch" : {
         "tags" : [ "notification-controller" ],
@@ -1802,7 +1875,7 @@
     "/api/series/{seriesId}/episodes/{episodeNo}" : {
       "get" : {
         "tags" : [ "episode-controller" ],
-        "operationId" : "detail",
+        "operationId" : "detail_1",
         "parameters" : [ {
           "name" : "seriesId",
           "in" : "path",
@@ -1837,7 +1910,7 @@
     "/api/series/{id}" : {
       "get" : {
         "tags" : [ "series-controller" ],
-        "operationId" : "detail_1",
+        "operationId" : "detail_2",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -1878,51 +1951,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/posts/{id}" : {
-      "get" : {
-        "tags" : [ "post-controller" ],
-        "operationId" : "detail_2",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PostDetailResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "post-controller" ],
-        "operationId" : "delete",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "204" : {
-            "description" : "No Content"
           }
         }
       }
@@ -3132,6 +3160,21 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "PostUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "content" : {
+            "type" : "string"
           }
         }
       },

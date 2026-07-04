@@ -9,8 +9,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -21,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.juhkang.artiv.domain.auth.AuthSupport;
 import com.juhkang.artiv.domain.community.dto.PostDetailResponse;
 import com.juhkang.artiv.domain.community.dto.PostResponse;
+import com.juhkang.artiv.domain.community.dto.PostUpdateRequest;
 import com.juhkang.artiv.global.dto.IdResponse;
 import com.juhkang.artiv.global.dto.PageResponse;
 
@@ -55,6 +58,13 @@ public class PostController {
     public PostDetailResponse detail(@AuthenticationPrincipal Long userId, @PathVariable Long id,
                                      Authentication authentication) {
         return postService.getDetail(id, userId, AuthSupport.isAdmin(authentication));
+    }
+
+    @PatchMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void update(@AuthenticationPrincipal Long userId, @PathVariable Long id,
+                       @RequestBody PostUpdateRequest request) {
+        postService.update(userId, id, request.category(), request.title(), request.content());
     }
 
     @DeleteMapping("/{id}")

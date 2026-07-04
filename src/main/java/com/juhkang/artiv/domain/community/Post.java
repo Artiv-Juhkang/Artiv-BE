@@ -65,6 +65,13 @@ public class Post extends BaseEntity {
         return authorId.equals(userId);
     }
 
+    /** 텍스트 필드 수정(작성자 전용 — 검증·권한은 서비스가 담당). */
+    public void update(PostCategory category, String title, String content) {
+        this.category = category;
+        this.title = title;
+        this.content = content;
+    }
+
     public void increaseLike() {
         this.likeCount++;
     }
