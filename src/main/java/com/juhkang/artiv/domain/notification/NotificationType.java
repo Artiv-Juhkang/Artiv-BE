@@ -7,5 +7,6 @@ public enum NotificationType {
     POST_COMMENT,        // 내 글에 댓글
     COMMENT_REPLY,       // 내 댓글에 답글
     FOLLOWED,            // 새 팔로워
-    POST_MENTIONED       // @닉네임 멘션
+    POST_MENTIONED,      // @닉네임 멘션
+    DM_REQUEST           // 새 메시지 요청(비상호 DIRECT 대화 생성)
 }
