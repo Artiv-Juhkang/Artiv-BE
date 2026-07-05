@@ -18,11 +18,12 @@ public record MyProfileResponse(
         String bio,
         String avatarUrl,
         LocalDate birthDate,
+        boolean profilePublic,
         Instant createdAt
 ) {
 
     public static MyProfileResponse of(User user, String avatarUrl) {
         return new MyProfileResponse(user.getId(), user.getEmail(), user.getNickname(), user.getRole(),
-                user.getBio(), avatarUrl, user.getBirthDate(), user.getCreatedAt());
+                user.getBio(), avatarUrl, user.getBirthDate(), user.isProfilePublic(), user.getCreatedAt());
     }
 }

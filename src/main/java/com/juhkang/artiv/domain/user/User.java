@@ -48,6 +48,9 @@ public class User extends BaseEntity {
     @Column(length = 500)
     private String bio;
 
+    @Column(name = "profile_public", nullable = false)
+    private boolean profilePublic = true;
+
     private User(String email, String password, String nickname, Role role, LocalDate birthDate) {
         this.email = email;
         this.password = password;
@@ -71,6 +74,11 @@ public class User extends BaseEntity {
 
     public void changeNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    /** 프로필 공개 설정(CH1) — 비공개여도 닉네임·아바타·역할은 공개, bio·가입일만 숨김. */
+    public void changeProfileVisibility(boolean profilePublic) {
+        this.profilePublic = profilePublic;
     }
 
     public void changeBio(String bio) {

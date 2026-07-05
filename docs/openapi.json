@@ -1222,6 +1222,34 @@
         }
       }
     },
+    "/api/users/me/profile-visibility" : {
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "changeProfileVisibility",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProfileVisibilityRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MyProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me/password" : {
       "patch" : {
         "tags" : [ "user-controller" ],
@@ -1924,6 +1952,33 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/CreatorRequestAdminResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "profile",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -2967,6 +3022,9 @@
             "type" : "string",
             "format" : "date"
           },
+          "profilePublic" : {
+            "type" : "boolean"
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -3192,6 +3250,14 @@
           }
         },
         "required" : [ "email", "password" ]
+      },
+      "ProfileVisibilityRequest" : {
+        "type" : "object",
+        "properties" : {
+          "profilePublic" : {
+            "type" : "boolean"
+          }
+        }
       },
       "PasswordChangeRequest" : {
         "type" : "object",
@@ -3673,6 +3739,35 @@
           }
         }
       },
+      "UserProfileResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "avatarUrl" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "READER", "CREATOR", "ADMIN" ]
+          },
+          "profilePublic" : {
+            "type" : "boolean"
+          },
+          "bio" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "FollowStatsResponse" : {
         "type" : "object",
         "properties" : {
@@ -3685,6 +3780,12 @@
             "format" : "int64"
           },
           "isFollowing" : {
+            "type" : "boolean"
+          },
+          "isFollowedBy" : {
+            "type" : "boolean"
+          },
+          "isMutual" : {
             "type" : "boolean"
           }
         }

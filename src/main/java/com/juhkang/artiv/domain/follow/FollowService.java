@@ -59,10 +59,14 @@ public class FollowService {
     }
 
     public FollowStatsResponse getStats(Long viewerId, Long targetId) {
+        boolean following = followRepository.existsByFollowerIdAndFollowingId(viewerId, targetId);
+        boolean followedBy = followRepository.existsByFollowerIdAndFollowingId(targetId, viewerId);
         return new FollowStatsResponse(
                 followRepository.countByFollowingId(targetId),
                 followRepository.countByFollowerId(targetId),
-                followRepository.existsByFollowerIdAndFollowingId(viewerId, targetId));
+                following,
+                followedBy,
+                following && followedBy); // 상호 = 친구(기존 결정: 별도 friendship 테이블 없음)
     }
 
     private FollowUserResponse toUser(User u) {

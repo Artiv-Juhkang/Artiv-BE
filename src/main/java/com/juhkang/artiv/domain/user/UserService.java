@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.artiv.domain.user.dto.MyProfileResponse;
+import com.juhkang.artiv.domain.user.dto.UserProfileResponse;
 import com.juhkang.artiv.domain.user.dto.UserResponse;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
@@ -31,6 +32,20 @@ public class UserService {
 
     public MyProfileResponse getMyProfile(Long userId) {
         return toProfile(load(userId));
+    }
+
+    /** 공개 프로필(타인 열람) — 비공개 마스킹은 DTO(UserProfileResponse.of)가 담당. */
+    public UserProfileResponse getProfile(Long targetId) {
+        User user = load(targetId);
+        String avatarUrl = user.getAvatarKey() != null ? imageStorageService.urlFor(user.getAvatarKey()) : null;
+        return UserProfileResponse.of(user, avatarUrl);
+    }
+
+    @Transactional
+    public MyProfileResponse changeProfileVisibility(Long userId, boolean profilePublic) {
+        User user = load(userId);
+        user.changeProfileVisibility(profilePublic);
+        return toProfile(user);
     }
 
     @Transactional
