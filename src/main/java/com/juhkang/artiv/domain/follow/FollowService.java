@@ -58,12 +58,20 @@ public class FollowService {
         return followRepository.findFollowerUsers(userId).stream().map(this::toUser).toList();
     }
 
+    /**
+     * 프로필 비공개 시 팔로워/팔로잉 수를 숨긴다(확3: bio·가입일·팔로우 수만 마스킹).
+     * 관계 플래그(isFollowing 등)는 조회자 자신의 상태라 공개 설정과 무관하게 유지한다.
+     * 본인이 자기 스탯을 볼 때는 항상 실제 값(마스킹 없음).
+     */
     public FollowStatsResponse getStats(Long viewerId, Long targetId) {
         boolean following = followRepository.existsByFollowerIdAndFollowingId(viewerId, targetId);
         boolean followedBy = followRepository.existsByFollowerIdAndFollowingId(targetId, viewerId);
+        boolean maskCounts = !viewerId.equals(targetId) && userRepository.findById(targetId)
+                .map(u -> !u.isProfilePublic())
+                .orElse(false);
         return new FollowStatsResponse(
-                followRepository.countByFollowingId(targetId),
-                followRepository.countByFollowerId(targetId),
+                maskCounts ? 0 : followRepository.countByFollowingId(targetId),
+                maskCounts ? 0 : followRepository.countByFollowerId(targetId),
                 following,
                 followedBy,
                 following && followedBy); // 상호 = 친구(기존 결정: 별도 friendship 테이블 없음)

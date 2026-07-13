@@ -116,4 +116,29 @@ class UserProfileFlowTest {
                 .andExpect(jsonPath("$.isFollowedBy").value(true))
                 .andExpect(jsonPath("$.isMutual").value(true));
     }
+
+    @Test
+    void 비공개_프로필의_팔로우_수는_타인에게_숨는다() throws Exception {
+        // target을 팔로우해 실제 카운트를 1로 만든다.
+        mockMvc.perform(post("/api/users/" + targetId + "/follow").header("Authorization", "Bearer " + viewerToken))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/api/users/" + targetId + "/follow-stats").header("Authorization", "Bearer " + viewerToken))
+                .andExpect(jsonPath("$.followerCount").value(1));
+
+        // target 비공개 전환 — 확3: bio·가입일·팔로우 수만 숨김(관계 플래그는 조회자 자신의 것이라 유지).
+        mockMvc.perform(patch("/api/users/me/profile-visibility")
+                        .header("Authorization", "Bearer " + targetToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"profilePublic\":false}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/users/" + targetId + "/follow-stats").header("Authorization", "Bearer " + viewerToken))
+                .andExpect(jsonPath("$.followerCount").value(0))
+                .andExpect(jsonPath("$.followingCount").value(0))
+                .andExpect(jsonPath("$.isFollowing").value(true)); // 관계 플래그는 유지
+
+        // 본인 자신의 스탯 조회는 비공개여도 실제 카운트를 본다.
+        mockMvc.perform(get("/api/users/" + targetId + "/follow-stats").header("Authorization", "Bearer " + targetToken))
+                .andExpect(jsonPath("$.followerCount").value(1));
+    }
 }

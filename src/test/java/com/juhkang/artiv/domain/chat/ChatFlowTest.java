@@ -214,6 +214,36 @@ class ChatFlowTest {
     }
 
     @Test
+    void 읽음처리는_다른_대화의_메시지_id를_거부한다() throws Exception {
+        long convAB = createDirect(aToken, bId);
+        follow(aToken, cId);
+        follow(cToken, aId); // 상호=친구 → 즉시 ACCEPTED
+        long convAC = createDirect(aToken, cId);
+
+        String sent = mockMvc.perform(post("/api/conversations/" + convAC + "/messages")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"다른 대화의 메시지\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long foreignMessageId = ((Number) JsonPath.read(sent, "$.id")).longValue();
+
+        // convAB의 멤버(A)가 convAC 소속 메시지 id로 읽음처리 시도 → 거부
+        mockMvc.perform(patch("/api/conversations/" + convAB + "/read")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastReadMessageId\":" + foreignMessageId + "}"))
+                .andExpect(status().isBadRequest());
+
+        // 존재하지 않는 메시지 id도 거부
+        mockMvc.perform(patch("/api/conversations/" + convAB + "/read")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastReadMessageId\":999999}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 비멤버는_대화를_볼_수_없다() throws Exception {
         long convId = createDirect(aToken, bId);
         mockMvc.perform(get("/api/conversations/" + convId + "/messages").header("Authorization", "Bearer " + cToken))

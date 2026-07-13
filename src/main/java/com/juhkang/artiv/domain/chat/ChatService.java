@@ -78,10 +78,14 @@ public class ChatService {
             memberRepository.save(ConversationMember.create(conversation.getId(), userId));
             memberRepository.save(ConversationMember.create(conversation.getId(), targetUserId));
         } catch (DataIntegrityViolationException race) {
-            // 동시 생성 경쟁 — 유니크 충돌이면 이미 만들어진 방을 반환(멱등).
-            return conversationRepository.findByDirectKey(key)
-                    .map(ConversationResponse::of)
-                    .orElseThrow(() -> race);
+            // 동시 생성 경쟁(direct_key 유니크 충돌). Postgres는 제약 위반이 발생한 트랜잭션
+            // 전체를 즉시 중단시키므로(이후 SELECT까지 "current transaction is aborted"),
+            // 같은 트랜잭션 안에서 안전하게 재조회할 방법이 없다 — 시도했으나(self-injection+
+            // REQUIRES_NEW) 이 프로젝트의 테스트가 전부 @Transactional 롤백-per-test에 의존해
+            // REQUIRES_NEW가 setUp()의 미커밋 데이터를 못 보는 새 문제를 만들었다. 그래서 같은
+            // 요청 안에서 조용히 복구하는 대신, 클라이언트가 재시도하면 위 findByDirectKey가
+            // 새 트랜잭션에서 이긴 쪽을 찾아 멱등하게 반환하도록 명확한 에러로 위임한다.
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
         if (conversation.getStatus() == ConversationStatus.PENDING) {
             String nickname = userRepository.findById(userId).map(User::getNickname).orElse("누군가");
@@ -133,11 +137,18 @@ public class ChatService {
         return PageResponse.from(page.map(m -> MessageResponse.of(m, names.getOrDefault(m.getSenderId(), "(탈퇴)"))));
     }
 
-    /** 읽음 포인터 전진 — 멤버만, 후퇴 없음. */
+    /** 읽음 포인터 전진 — 멤버만, 후퇴 없음. lastReadMessageId는 반드시 이 대화 소속 메시지여야 한다. */
     @Transactional
     public void readUpTo(Long userId, Long conversationId, Long lastReadMessageId) {
         ConversationMember member = memberRepository.findByConversationIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
+        if (lastReadMessageId != null) {
+            Message message = messageRepository.findById(lastReadMessageId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT));
+            if (!message.getConversationId().equals(conversationId)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT);
+            }
+        }
         member.readUpTo(lastReadMessageId);
     }
 
