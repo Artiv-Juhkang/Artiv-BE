@@ -64,6 +64,22 @@ class ReportFlowTest {
         return ((Number) JsonPath.read(body, "$.id")).longValue();
     }
 
+    /** poster가 targetId에게 DIRECT를 만들고(멱등, PENDING 가능) 본인이 메시지 하나를 보낸다. */
+    private long createMessage(long targetId) throws Exception {
+        String conv = mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + posterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"DIRECT\",\"targetUserId\":" + targetId + "}"))
+                .andReturn().getResponse().getContentAsString();
+        long convId = ((Number) JsonPath.read(conv, "$.id")).longValue();
+        String msg = mockMvc.perform(post("/api/conversations/" + convId + "/messages")
+                        .header("Authorization", "Bearer " + posterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"신고 대상 메시지\"}"))
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(msg, "$.id")).longValue();
+    }
+
     private void report(String token, String targetType, long targetId, int expected) throws Exception {
         mockMvc.perform(post("/api/reports").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -122,5 +138,30 @@ class ReportFlowTest {
     void 비관리자는_신고_관리에_접근할_수_없다_403() throws Exception {
         mockMvc.perform(get("/api/admin/reports").header("Authorization", "Bearer " + reporters[0]))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 대화_멤버는_메시지를_신고할_수_있다() throws Exception {
+        long messageId = createMessage(userIdOf(reporters[0]));
+        report(reporters[0], "MESSAGE", messageId, 201);
+
+        mockMvc.perform(get("/api/admin/reports").param("status", "PENDING")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(jsonPath("$.content[0].targetType").value("MESSAGE"));
+    }
+
+    @Test
+    void 대화_멤버가_아니면_메시지를_신고할_수_없다_403() throws Exception {
+        long messageId = createMessage(userIdOf(reporters[0]));
+        report(reporters[1], "MESSAGE", messageId, 403);
+    }
+
+    @Test
+    void 없는_메시지_신고는_404() throws Exception {
+        report(reporters[0], "MESSAGE", 999999, 404);
+    }
+
+    private long userIdOf(String token) {
+        return jwtProvider.getUserId(token);
     }
 }

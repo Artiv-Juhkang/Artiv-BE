@@ -42,25 +42,30 @@ public class Conversation extends BaseEntity {
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
+    /** 익명방(CH5, 확정 D4=b) — GROUP 전용. 발신자 표기만 마스킹, senderId는 그대로 저장. */
+    @Column(nullable = false)
+    private boolean anonymous;
+
     private Conversation(ConversationType type, ConversationStatus status, String title,
-                         String directKey, Long createdBy) {
+                         String directKey, Long createdBy, boolean anonymous) {
         this.type = type;
         this.status = status;
         this.title = title;
         this.directKey = directKey;
         this.createdBy = createdBy;
+        this.anonymous = anonymous;
     }
 
     /** DIRECT 대화 — 친구(상호 팔로우)면 즉시 ACCEPTED, 아니면 PENDING(수신자 수락 대기). */
     public static Conversation direct(Long createdBy, String directKey, boolean mutualFollow) {
         return new Conversation(ConversationType.DIRECT,
                 mutualFollow ? ConversationStatus.ACCEPTED : ConversationStatus.PENDING,
-                null, directKey, createdBy);
+                null, directKey, createdBy, false);
     }
 
     /** GROUP 대화 — 멤버 전원이 이미 친구 검증을 통과했으므로 요청 없이 항상 즉시 ACCEPTED. */
-    public static Conversation group(Long createdBy, String title) {
-        return new Conversation(ConversationType.GROUP, ConversationStatus.ACCEPTED, title, null, createdBy);
+    public static Conversation group(Long createdBy, String title, boolean anonymous) {
+        return new Conversation(ConversationType.GROUP, ConversationStatus.ACCEPTED, title, null, createdBy, anonymous);
     }
 
     public void accept() {

@@ -2991,7 +2991,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE" ]
+            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE", "MESSAGE" ]
           }
         }, {
           "name" : "reason",
@@ -3464,7 +3464,7 @@
         "properties" : {
           "targetType" : {
             "type" : "string",
-            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE" ]
+            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE", "MESSAGE" ]
           },
           "targetId" : {
             "type" : "integer",
@@ -3545,6 +3545,9 @@
               "type" : "integer",
               "format" : "int64"
             }
+          },
+          "anonymous" : {
+            "type" : "boolean"
           }
         }
       },
@@ -3562,6 +3565,9 @@
           "status" : {
             "type" : "string",
             "enum" : [ "PENDING", "ACCEPTED", "DECLINED" ]
+          },
+          "anonymous" : {
+            "type" : "boolean"
           }
         }
       },
@@ -3988,7 +3994,7 @@
           },
           "targetType" : {
             "type" : "string",
-            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE" ]
+            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE", "MESSAGE" ]
           },
           "targetId" : {
             "type" : "integer",
@@ -5348,7 +5354,7 @@
           },
           "targetType" : {
             "type" : "string",
-            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE" ]
+            "enum" : [ "POST", "COMMENT", "USER", "SERIES", "EPISODE", "MESSAGE" ]
           },
           "targetId" : {
             "type" : "integer",

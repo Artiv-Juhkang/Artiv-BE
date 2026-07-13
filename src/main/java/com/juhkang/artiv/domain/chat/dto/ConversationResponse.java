@@ -8,10 +8,11 @@ import com.juhkang.artiv.domain.chat.ConversationType;
 public record ConversationResponse(
         Long id,
         ConversationType type,
-        ConversationStatus status
+        ConversationStatus status,
+        boolean anonymous
 ) {
 
     public static ConversationResponse of(Conversation c) {
-        return new ConversationResponse(c.getId(), c.getType(), c.getStatus());
+        return new ConversationResponse(c.getId(), c.getType(), c.getStatus(), c.isAnonymous());
     }
 }

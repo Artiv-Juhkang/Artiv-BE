@@ -35,13 +35,22 @@ public class ConversationMember extends BaseEntity {
     @Column(name = "last_read_message_id")
     private Long lastReadMessageId;
 
-    private ConversationMember(Long conversationId, Long userId) {
+    /** 익명방(CH5) 내 표시 순번('익명N') — 방 생성 시 1부터 배정, 비익명방이면 무의미(미사용). */
+    @Column(name = "anon_alias")
+    private Integer anonAlias;
+
+    private ConversationMember(Long conversationId, Long userId, Integer anonAlias) {
         this.conversationId = conversationId;
         this.userId = userId;
+        this.anonAlias = anonAlias;
     }
 
     public static ConversationMember create(Long conversationId, Long userId) {
-        return new ConversationMember(conversationId, userId);
+        return new ConversationMember(conversationId, userId, null);
+    }
+
+    public static ConversationMember create(Long conversationId, Long userId, Integer anonAlias) {
+        return new ConversationMember(conversationId, userId, anonAlias);
     }
 
     /** 읽음 포인터 전진(후퇴 방지 — 클라 재전송/역순 패치에도 최댓값 유지). */

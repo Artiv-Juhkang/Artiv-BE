@@ -108,7 +108,7 @@ public class ChatService {
      * 최소 2명(총 3인 이상)부터 '단체'로 본다 — 1명이면 DIRECT와 다를 바 없다.
      */
     @Transactional
-    public ConversationResponse createGroup(Long userId, String title, List<Long> memberIds) {
+    public ConversationResponse createGroup(Long userId, String title, List<Long> memberIds, boolean anonymous) {
         if (title == null || title.isBlank() || title.strip().length() > 100) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
@@ -124,10 +124,12 @@ public class ChatService {
             throw new BusinessException(ErrorCode.INVALID_INPUT); // 친구 아닌 사용자 포함
         }
 
-        Conversation conversation = conversationRepository.save(Conversation.group(userId, title.strip()));
-        memberRepository.save(ConversationMember.create(conversation.getId(), userId));
+        Conversation conversation = conversationRepository.save(Conversation.group(userId, title.strip(), anonymous));
+        // 익명 여부와 무관하게 1부터 순번 배정(생성자=1) — anonymous일 때만 응답에서 실제로 쓰인다.
+        memberRepository.save(ConversationMember.create(conversation.getId(), userId, 1));
+        int alias = 2;
         for (Long memberId : distinctMembers) {
-            memberRepository.save(ConversationMember.create(conversation.getId(), memberId));
+            memberRepository.save(ConversationMember.create(conversation.getId(), memberId, alias++));
         }
         return ConversationResponse.of(conversation);
     }
@@ -160,14 +162,26 @@ public class ChatService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         Message saved = messageRepository.save(Message.create(conversationId, userId, content.strip()));
-        String nickname = userRepository.findById(userId).map(User::getNickname).orElse("(탈퇴)");
-        return MessageResponse.of(saved, nickname);
+        String displayName;
+        if (conversation.isAnonymous()) {
+            displayName = "익명" + memberRepository.findByConversationIdAndUserId(conversationId, userId)
+                    .map(ConversationMember::getAnonAlias).orElse(0);
+        } else {
+            displayName = userRepository.findById(userId).map(User::getNickname).orElse("(탈퇴)");
+        }
+        return MessageResponse.of(saved, displayName);
     }
 
-    /** 대화 메시지(최신순 Page) — 멤버만. */
+    /** 대화 메시지(최신순 Page) — 멤버만. 익명방이면 발신자 표기를 '익명N'으로 마스킹(senderId는 그대로). */
     public PageResponse<MessageResponse> getMessages(Long userId, Long conversationId, Pageable pageable) {
-        loadAsMember(userId, conversationId);
+        Conversation conversation = loadAsMember(userId, conversationId);
         Page<Message> page = messageRepository.findPageByConversationId(conversationId, Pageables.pageOnly(pageable));
+        if (conversation.isAnonymous()) {
+            Map<Long, Integer> aliases = memberRepository.findByConversationId(conversationId).stream()
+                    .collect(Collectors.toMap(ConversationMember::getUserId, ConversationMember::getAnonAlias));
+            return PageResponse.from(page.map(m ->
+                    MessageResponse.of(m, "익명" + aliases.getOrDefault(m.getSenderId(), 0))));
+        }
         Map<Long, String> names = nicknames(page.getContent().stream().map(Message::getSenderId).toList());
         return PageResponse.from(page.map(m -> MessageResponse.of(m, names.getOrDefault(m.getSenderId(), "(탈퇴)"))));
     }

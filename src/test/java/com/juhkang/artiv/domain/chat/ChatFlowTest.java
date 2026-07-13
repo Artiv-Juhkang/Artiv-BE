@@ -277,6 +277,37 @@ class ChatFlowTest {
     }
 
     @Test
+    void 익명방은_발신자_표기가_익명N으로_마스킹되지만_senderId는_실제값이다() throws Exception {
+        follow(aToken, bId); follow(bToken, aId); // A-B 친구
+        follow(aToken, cId); follow(cToken, aId); // A-C 친구
+
+        String body = mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"비밀모임\",\"memberIds\":[" + bId + "," + cId
+                                + "],\"anonymous\":true}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.anonymous").value(true))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = ((Number) JsonPath.read(body, "$.id")).longValue();
+
+        // 전송 응답 자체도 마스킹(발신자 본인이 봐도 실명 아님).
+        mockMvc.perform(post("/api/conversations/" + groupId + "/messages")
+                        .header("Authorization", "Bearer " + bToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"비밀 얘기\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.senderNickname").value("익명2"))
+                .andExpect(jsonPath("$.senderId").value(bId));
+
+        // 목록 조회에서도 동일하게 마스킹, senderId는 그대로.
+        mockMvc.perform(get("/api/conversations/" + groupId + "/messages").header("Authorization", "Bearer " + aToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].senderNickname").value("익명2"))
+                .andExpect(jsonPath("$.content[0].senderId").value(bId));
+    }
+
+    @Test
     void 친구가_아닌_사람이_섞이면_단체방_생성이_거부된다() throws Exception {
         follow(aToken, bId); follow(bToken, aId); // A-B만 친구, C는 아님
         mockMvc.perform(post("/api/conversations")

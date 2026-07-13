@@ -39,7 +39,8 @@ public class ChatController {
     public ConversationResponse create(@AuthenticationPrincipal Long userId,
                                        @RequestBody ConversationCreateRequest request) {
         if (request.type() == ConversationType.GROUP) {
-            return chatService.createGroup(userId, request.title(), request.memberIds());
+            return chatService.createGroup(userId, request.title(), request.memberIds(),
+                    Boolean.TRUE.equals(request.anonymous()));
         }
         if (request.type() != ConversationType.DIRECT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
