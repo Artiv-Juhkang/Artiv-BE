@@ -1,5 +1,6 @@
 package com.juhkang.artiv.domain.user;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 import com.juhkang.artiv.global.entity.BaseEntity;
@@ -51,6 +52,10 @@ public class User extends BaseEntity {
     @Column(name = "profile_public", nullable = false)
     private boolean profilePublic = true;
 
+    /** 탈퇴 시각(soft delete, 확정 D5=A). null이면 활성 계정. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private User(String email, String password, String nickname, Role role, LocalDate birthDate) {
         this.email = email;
         this.password = password;
@@ -92,5 +97,12 @@ public class User extends BaseEntity {
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
+    }
+
+    /** 회원 탈퇴 — email/nickname을 센티널로 치환해 unique를 비우고(재가입 허용) deletedAt을 찍는다. */
+    public void withdraw() {
+        this.email = "withdrawn+" + id + "@artiv.invalid";
+        this.nickname = "탈퇴회원" + id;
+        this.deletedAt = Instant.now();
     }
 }

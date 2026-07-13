@@ -2210,6 +2210,25 @@
             }
           }
         }
+      },
+      "delete" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "withdraw",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WithdrawRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        }
       }
     },
     "/api/users/me/friends" : {
@@ -5471,6 +5490,16 @@
             "type" : "boolean"
           }
         }
+      },
+      "WithdrawRequest" : {
+        "type" : "object",
+        "properties" : {
+          "password" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "password" ]
       }
     },
     "securitySchemes" : {

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.juhkang.artiv.domain.auth.RefreshTokenRepository;
+import com.juhkang.artiv.domain.series.SeriesRepository;
 import com.juhkang.artiv.domain.user.dto.MyProfileResponse;
 import com.juhkang.artiv.domain.user.dto.UserProfileResponse;
 import com.juhkang.artiv.domain.user.dto.UserResponse;
@@ -25,6 +27,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ImageStorageService imageStorageService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final SeriesRepository seriesRepository;
 
     public UserResponse getMyInfo(Long userId) {
         return UserResponse.of(load(userId));
@@ -95,6 +99,24 @@ public class UserService {
         if (key != null) {
             imageStorageService.delete(key);
             user.changeAvatar(null);
+        }
+    }
+
+    /** 회원 탈퇴 — 비번 검증→아바타 삭제→soft delete(센티널)→refresh 토큰 전량 폐기→(작가면) 작품 일괄 비공개(D6=B). */
+    @Transactional
+    public void withdraw(Long userId, String password) {
+        User user = load(userId);
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT); // 현재 비밀번호 불일치
+        }
+        String avatarKey = user.getAvatarKey();
+        if (avatarKey != null) {
+            imageStorageService.delete(avatarKey);
+        }
+        user.withdraw();
+        refreshTokenRepository.deleteByUserId(userId);
+        if (user.getRole() == Role.CREATOR) {
+            seriesRepository.findByAuthorId(userId).forEach(series -> series.changeVisibility(false));
         }
     }
 

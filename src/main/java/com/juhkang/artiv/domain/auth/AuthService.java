@@ -82,6 +82,9 @@ public class AuthService {
         }
         User user = userRepository.findById(stored.getUserId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN); // 탈퇴 계정 — access는 자연 만료(≤1h) 수용
+        }
         refreshTokenRepository.delete(stored); // 회전: 사용한 토큰은 즉시 폐기
         return issueTokens(user);
     }

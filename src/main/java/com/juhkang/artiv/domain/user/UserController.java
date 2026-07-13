@@ -20,6 +20,7 @@ import com.juhkang.artiv.domain.user.dto.ProfileVisibilityRequest;
 import com.juhkang.artiv.domain.user.dto.UserProfileResponse;
 import com.juhkang.artiv.domain.user.dto.NicknameUpdateRequest;
 import com.juhkang.artiv.domain.user.dto.PasswordChangeRequest;
+import com.juhkang.artiv.domain.user.dto.WithdrawRequest;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -76,5 +77,11 @@ public class UserController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAvatar(@AuthenticationPrincipal Long userId) {
         userService.deleteAvatar(userId);
+    }
+
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void withdraw(@AuthenticationPrincipal Long userId, @Valid @RequestBody WithdrawRequest request) {
+        userService.withdraw(userId, request.password());
     }
 }
