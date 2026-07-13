@@ -51,6 +51,44 @@
         }
       }
     },
+    "/api/users/{targetId}/block" : {
+      "post" : {
+        "tags" : [ "block-controller" ],
+        "operationId" : "block",
+        "parameters" : [ {
+          "name" : "targetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "201" : {
+            "description" : "Created"
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "block-controller" ],
+        "operationId" : "unblock",
+        "parameters" : [ {
+          "name" : "targetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        }
+      }
+    },
     "/api/users/me/creator-request" : {
       "get" : {
         "tags" : [ "creator-request-controller" ],
@@ -2294,6 +2332,27 @@
         }
       }
     },
+    "/api/users/me/blocks" : {
+      "get" : {
+        "tags" : [ "block-controller" ],
+        "operationId" : "blocks",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BlockedUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/series/{seriesId}/episodes/{episodeNo}" : {
       "get" : {
         "tags" : [ "episode-controller" ],
@@ -4152,6 +4211,21 @@
         }
       },
       "FollowUserResponse" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "avatarUrl" : {
+            "type" : "string"
+          }
+        }
+      },
+      "BlockedUserResponse" : {
         "type" : "object",
         "properties" : {
           "userId" : {

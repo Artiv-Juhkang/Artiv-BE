@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.juhkang.artiv.domain.block.BlockRepository;
 import com.juhkang.artiv.domain.chat.dto.ChatUnreadCountResponse;
 import com.juhkang.artiv.domain.chat.dto.ConversationResponse;
 import com.juhkang.artiv.domain.chat.dto.ConversationSummaryResponse;
@@ -47,6 +48,7 @@ public class ChatService {
     private final ConversationMemberRepository memberRepository;
     private final MessageRepository messageRepository;
     private final FollowRepository followRepository;
+    private final BlockRepository blockRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final ImageStorageService imageStorageService;
@@ -62,6 +64,10 @@ public class ChatService {
         }
         if (!userRepository.existsById(targetUserId)) {
             throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+        if (blockRepository.existsByBlockerIdAndBlockedId(userId, targetUserId)
+                || blockRepository.existsByBlockerIdAndBlockedId(targetUserId, userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN); // 차단 관계 — DM 생성/요청 불가(CB, D7=a)
         }
         String key = directKey(userId, targetUserId);
         return conversationRepository.findByDirectKey(key)
