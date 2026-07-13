@@ -244,6 +244,66 @@ class ChatFlowTest {
     }
 
     @Test
+    void 단체방은_친구_전원일_때만_생성되고_즉시_ACCEPTED다() throws Exception {
+        follow(aToken, bId); follow(bToken, aId); // A-B 친구
+        follow(aToken, cId); follow(cToken, aId); // A-C 친구
+
+        String body = mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"우리끼리\",\"memberIds\":[" + bId + "," + cId + "]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = ((Number) JsonPath.read(body, "$.id")).longValue();
+
+        // 멤버 전원(B, C)이 즉시 메시지를 보낼 수 있다(PENDING 없음).
+        mockMvc.perform(post("/api/conversations/" + groupId + "/messages")
+                        .header("Authorization", "Bearer " + bToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"안녕!\"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/conversations/" + groupId + "/messages")
+                        .header("Authorization", "Bearer " + cToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"반가워요\"}"))
+                .andExpect(status().isCreated());
+
+        // 인박스에 GROUP 표시명=title, 메시지가 도착한 순으로 보인다.
+        mockMvc.perform(get("/api/me/conversations").header("Authorization", "Bearer " + aToken))
+                .andExpect(jsonPath("$[0].displayName").value("우리끼리"))
+                .andExpect(jsonPath("$[0].type").value("GROUP"))
+                .andExpect(jsonPath("$[0].lastMessage").value("반가워요"));
+    }
+
+    @Test
+    void 친구가_아닌_사람이_섞이면_단체방_생성이_거부된다() throws Exception {
+        follow(aToken, bId); follow(bToken, aId); // A-B만 친구, C는 아님
+        mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"모임\",\"memberIds\":[" + bId + "," + cId + "]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 단체방_제목이_비었거나_친구가_2명_미만이면_거부된다() throws Exception {
+        follow(aToken, bId); follow(bToken, aId);
+        follow(aToken, cId); follow(cToken, aId);
+
+        mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"  \",\"memberIds\":[" + bId + "," + cId + "]}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"단둘이\",\"memberIds\":[" + bId + "]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 비멤버는_대화를_볼_수_없다() throws Exception {
         long convId = createDirect(aToken, bId);
         mockMvc.perform(get("/api/conversations/" + convId + "/messages").header("Authorization", "Bearer " + cToken))

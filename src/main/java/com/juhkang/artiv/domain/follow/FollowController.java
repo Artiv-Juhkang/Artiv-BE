@@ -47,6 +47,11 @@ public class FollowController {
         return followService.getFollowers(userId);
     }
 
+    @GetMapping("/me/friends")
+    public List<FollowUserResponse> friends(@AuthenticationPrincipal Long userId) {
+        return followService.getFriends(userId);
+    }
+
     @GetMapping("/{targetId}/follow-stats")
     public FollowStatsResponse stats(@AuthenticationPrincipal Long userId, @PathVariable Long targetId) {
         return followService.getStats(userId, targetId);

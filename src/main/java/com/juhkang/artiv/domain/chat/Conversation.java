@@ -58,6 +58,11 @@ public class Conversation extends BaseEntity {
                 null, directKey, createdBy);
     }
 
+    /** GROUP 대화 — 멤버 전원이 이미 친구 검증을 통과했으므로 요청 없이 항상 즉시 ACCEPTED. */
+    public static Conversation group(Long createdBy, String title) {
+        return new Conversation(ConversationType.GROUP, ConversationStatus.ACCEPTED, title, null, createdBy);
+    }
+
     public void accept() {
         this.status = ConversationStatus.ACCEPTED;
     }

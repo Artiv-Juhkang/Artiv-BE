@@ -109,4 +109,26 @@ class FollowFlowTest {
         mockMvc.perform(post("/api/users/99999/follow").header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void 친구_목록은_상호_팔로우만_실린다() throws Exception {
+        User onlyFollowedByMe = userRepository.save(User.create("c@t.com", passwordEncoder.encode("pw"), "짝사랑", Role.READER, ADULT));
+        User onlyFollowsMe = userRepository.save(User.create("d@t.com", passwordEncoder.encode("pw"), "팬", Role.READER, ADULT));
+        String fanToken = jwtProvider.createAccessToken(onlyFollowsMe.getId(), Role.READER);
+
+        // 단방향 둘(친구 아님) + 상호 하나(작가)
+        mockMvc.perform(post("/api/users/" + onlyFollowedByMe.getId() + "/follow").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/users/" + readerId + "/follow").header("Authorization", "Bearer " + fanToken))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/users/" + authorId + "/follow").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/users/" + readerId + "/follow").header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/users/me/friends").header("Authorization", "Bearer " + readerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nickname").value("작가"));
+    }
 }

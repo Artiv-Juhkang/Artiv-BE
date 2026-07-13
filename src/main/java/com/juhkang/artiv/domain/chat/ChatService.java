@@ -97,6 +97,35 @@ public class ChatService {
         return ConversationResponse.of(conversation);
     }
 
+    /**
+     * 단체방 생성 — 멤버 전원이 생성자와 친구(상호 팔로우)여야 하며 항상 즉시 ACCEPTED(요청 없음).
+     * 최소 2명(총 3인 이상)부터 '단체'로 본다 — 1명이면 DIRECT와 다를 바 없다.
+     */
+    @Transactional
+    public ConversationResponse createGroup(Long userId, String title, List<Long> memberIds) {
+        if (title == null || title.isBlank() || title.strip().length() > 100) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+        List<Long> distinctMembers = memberIds == null ? List.of()
+                : memberIds.stream().filter(id -> id != null && !id.equals(userId)).distinct().toList();
+        if (distinctMembers.size() < 2) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+        boolean allFriends = distinctMembers.stream().allMatch(memberId ->
+                followRepository.existsByFollowerIdAndFollowingId(userId, memberId)
+                        && followRepository.existsByFollowerIdAndFollowingId(memberId, userId));
+        if (!allFriends) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT); // 친구 아닌 사용자 포함
+        }
+
+        Conversation conversation = conversationRepository.save(Conversation.group(userId, title.strip()));
+        memberRepository.save(ConversationMember.create(conversation.getId(), userId));
+        for (Long memberId : distinctMembers) {
+            memberRepository.save(ConversationMember.create(conversation.getId(), memberId));
+        }
+        return ConversationResponse.of(conversation);
+    }
+
     /** 요청 수락 — DIRECT PENDING의 수신자만. */
     @Transactional
     public ConversationResponse accept(Long userId, Long conversationId) {
@@ -202,7 +231,10 @@ public class ChatService {
 
         return conversations.stream()
                 .map(c -> {
-                    Long partnerId = partnerByConv.get(c.getId());
+                    // GROUP은 non-self 멤버가 여러 명이라 partnerByConv가 그중 하나만 임의로
+                    // 담고 있다(F23) — DIRECT에서만 "상대 1인"이 의미 있으므로 GROUP은 null로
+                    // 둔다(표시명은 title로 이미 충분, 아바타는 FE가 그룹 기본 아이콘으로 대체).
+                    Long partnerId = c.getType() == ConversationType.DIRECT ? partnerByConv.get(c.getId()) : null;
                     User partner = partnerId == null ? null : partners.get(partnerId);
                     String displayName = c.getType() == ConversationType.GROUP
                             ? c.getTitle()

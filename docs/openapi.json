@@ -2212,6 +2212,27 @@
         }
       }
     },
+    "/api/users/me/friends" : {
+      "get" : {
+        "tags" : [ "follow-controller" ],
+        "operationId" : "friends",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/FollowUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me/following" : {
       "get" : {
         "tags" : [ "follow-controller" ],
@@ -3436,6 +3457,16 @@
           "targetUserId" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "memberIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
           }
         }
       },

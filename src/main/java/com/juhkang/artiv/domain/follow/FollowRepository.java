@@ -25,4 +25,11 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     /** 나를 팔로우하는 사용자들. */
     @Query("select u from Follow f, User u where u.id = f.followerId and f.followingId = :uid order by f.id desc")
     List<User> findFollowerUsers(@Param("uid") Long uid);
+
+    /** 친구(상호 팔로우) — 내가 팔로우하고 나를도 팔로우하는 사용자(자가 조인, CH4). */
+    @Query("select u from Follow f1, Follow f2, User u "
+            + "where f1.followerId = :uid and f1.followingId = u.id "
+            + "and f2.followerId = u.id and f2.followingId = :uid "
+            + "order by u.nickname asc")
+    List<User> findMutualFollows(@Param("uid") Long uid);
 }

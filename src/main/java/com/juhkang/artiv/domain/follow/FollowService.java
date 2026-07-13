@@ -58,6 +58,11 @@ public class FollowService {
         return followRepository.findFollowerUsers(userId).stream().map(this::toUser).toList();
     }
 
+    /** 친구(상호 팔로우) 목록 — 단체 채팅방 생성 시 초대 후보(CH4). */
+    public List<FollowUserResponse> getFriends(Long userId) {
+        return followRepository.findMutualFollows(userId).stream().map(this::toUser).toList();
+    }
+
     /**
      * 프로필 비공개 시 팔로워/팔로잉 수를 숨긴다(확3: bio·가입일·팔로우 수만 마스킹).
      * 관계 플래그(isFollowing 등)는 조회자 자신의 상태라 공개 설정과 무관하게 유지한다.

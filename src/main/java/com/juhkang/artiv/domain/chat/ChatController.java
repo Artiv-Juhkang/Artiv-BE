@@ -38,8 +38,11 @@ public class ChatController {
     @ResponseStatus(HttpStatus.CREATED)
     public ConversationResponse create(@AuthenticationPrincipal Long userId,
                                        @RequestBody ConversationCreateRequest request) {
+        if (request.type() == ConversationType.GROUP) {
+            return chatService.createGroup(userId, request.title(), request.memberIds());
+        }
         if (request.type() != ConversationType.DIRECT) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT); // GROUP은 CH4
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
         return chatService.createDirect(userId, request.targetUserId());
     }
