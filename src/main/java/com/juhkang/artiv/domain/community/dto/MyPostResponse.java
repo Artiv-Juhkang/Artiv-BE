@@ -3,12 +3,11 @@ package com.juhkang.artiv.domain.community.dto;
 import java.time.Instant;
 
 import com.juhkang.artiv.domain.community.Post;
-import com.juhkang.artiv.domain.community.PostCategory;
 
 /** 내가 쓴 글 항목 — 본인 것이라 작성자 닉네임 생략, 블라인드 상태는 플래그로 노출. */
 public record MyPostResponse(
         Long id,
-        PostCategory category,
+        String category,
         String title,
         int likeCount,
         boolean blinded,

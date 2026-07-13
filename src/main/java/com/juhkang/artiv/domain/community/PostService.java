@@ -43,13 +43,15 @@ public class PostService {
     private final PostImageRepository postImageRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostDislikeRepository postDislikeRepository;
+    private final PostCategoryRepository postCategoryRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
     private final NotificationService notificationService;
 
     @Transactional
-    public Long create(Long authorId, PostCategory category, String title, String content, List<MultipartFile> images) {
-        if (category == null || title == null || title.isBlank() || title.strip().length() > 255
+    public Long create(Long authorId, String category, String title, String content, List<MultipartFile> images) {
+        if (category == null || !postCategoryRepository.existsByName(category)
+                || title == null || title.isBlank() || title.strip().length() > 255
                 || content == null || content.isBlank() || content.strip().length() > 5000
                 || (images != null && images.size() > MAX_IMAGES)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
@@ -80,7 +82,7 @@ public class PostService {
                 postId, actorId, "멘션 알림", message, rid -> dedupBase + ":" + rid);
     }
 
-    public PageResponse<PostResponse> getList(PostCategory category, PostSort sort, Pageable pageable) {
+    public PageResponse<PostResponse> getList(String category, PostSort sort, Pageable pageable) {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.toSort());
         Page<Post> page = postRepository.findVisible(category, sorted);
         Map<Long, String> names = nicknames(page.getContent());
@@ -109,8 +111,9 @@ public class PostService {
      * 기발송 수신자를 억제하므로 새로 추가된 멘션에만 알림이 간다.
      */
     @Transactional
-    public void update(Long userId, Long id, PostCategory category, String title, String content) {
-        if (category == null || title == null || title.isBlank() || title.strip().length() > 255
+    public void update(Long userId, Long id, String category, String title, String content) {
+        if (category == null || !postCategoryRepository.existsByName(category)
+                || title == null || title.isBlank() || title.strip().length() > 255
                 || content == null || content.isBlank() || content.strip().length() > 5000) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
@@ -189,7 +192,7 @@ public class PostService {
     }
 
     // ---- 관리자 ----
-    public PageResponse<PostAdminResponse> getForAdmin(PostCategory category, String keyword, Boolean blinded, Pageable pageable) {
+    public PageResponse<PostAdminResponse> getForAdmin(String category, String keyword, Boolean blinded, Pageable pageable) {
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.strip() : null;
         Page<Post> page = postRepository.findForAdmin(category, kw, blinded, pageable);
         Map<Long, String> names = nicknames(page.getContent());

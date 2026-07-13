@@ -10,10 +10,9 @@
   const ISTATUS = { PENDING: '대기', ANSWERED: '답변완료', CLOSED: '종료' };
   const CONSENT_LABEL = { TERMS_OF_SERVICE: '서비스 이용약관', PRIVACY_POLICY: '개인정보 처리방침', MARKETING_EMAIL: '마케팅 수신', ADULT_CONTENT_19: '성인 콘텐츠 열람' };
   const CREQ_STATUS = { PENDING: '대기', APPROVED: '승인', REJECTED: '거부' };
-  const PCAT = { RECOMMEND: '추천', FREE: '자유', FANART: '팬아트', QUESTION: '질문' };
   const RREASON = { SPAM: '스팸', ABUSE: '욕설', SEXUAL: '음란', COPYRIGHT: '저작권', ETC: '기타' };
   const RSTATUS = { PENDING: '접수', RESOLVED: '처리', DISMISSED: '기각' };
-  const RTYPE = { POST: '게시글', COMMENT: '댓글', USER: '사용자', SERIES: '작품', EPISODE: '회차' };
+  const RTYPE = { POST: '게시글', COMMENT: '댓글', USER: '사용자', SERIES: '작품', EPISODE: '회차', MESSAGE: '메시지' };
 
   const state = {
     token: localStorage.getItem('artiv_token') || null,
@@ -1141,17 +1140,22 @@
   let adminPostKw = '';
   let adminPostCategory = '';
   let adminPostBlinded = '';
-  function viewAdminCommunity() {
+  async function viewAdminCommunity() {
     setMain(`<div class="page-head"><div><span class="eyebrow">Admin</span><h1>커뮤니티 관리</h1>
       <p>블라인드 포함 전체 게시글. 검색·필터 후 글을 눌러 확인하세요</p></div></div>
       <form class="filters" id="pc-filter">
         <input class="search-input" id="pc-kw" placeholder="제목 검색" autocomplete="off" value="${esc(adminPostKw)}">
-        <select id="pc-cat"><option value="">전체 종류</option>${Object.entries(PCAT).map(([k, v]) => `<option value="${k}" ${k === adminPostCategory ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select id="pc-cat"><option value="">전체 종류</option>${loading}</select>
         <select id="pc-blind"><option value="">전체</option><option value="false" ${adminPostBlinded === 'false' ? 'selected' : ''}>공개</option><option value="true" ${adminPostBlinded === 'true' ? 'selected' : ''}>블라인드</option></select>
         <button class="btn btn--sm" type="submit">검색</button>
       </form>
       <div id="pc-list">${loading}</div>`);
     $('#pc-filter').addEventListener('submit', (e) => { e.preventDefault(); adminPostKw = $('#pc-kw').value.trim(); adminPostCategory = $('#pc-cat').value; adminPostBlinded = $('#pc-blind').value; loadAdminPosts(); });
+    // 카테고리는 사용자 등록제(C7)라 고정 목록이 아니라 매번 조회 — 새로 등록된 것도 필터에 뜬다.
+    try {
+      const cats = await api('GET', '/api/post-categories');
+      $('#pc-cat').innerHTML = `<option value="">전체 종류</option>${cats.map((c) => `<option value="${esc(c.name)}" ${c.name === adminPostCategory ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}`;
+    } catch (e) { /* 필터 목록 실패는 무시 — 검색 자체는 그대로 동작 */ }
     loadAdminPosts();
   }
   async function loadAdminPosts() {
@@ -1169,7 +1173,7 @@
     const when = p.createdAt ? new Date(p.createdAt).toLocaleDateString('ko-KR') : '';
     return `<div class="row" data-id="${p.id}" ${p.blinded ? 'style="opacity:.6"' : ''}><span class="row__no mono">#${p.id}</span>
       <div class="row__main"><div class="t">${esc(p.title)} ${p.blinded ? '<span class="tag tag--19">블라인드</span>' : ''}</div>
-        <div class="s">${PCAT[p.category] || p.category} · ${esc(p.authorNickname)} · ♡${p.likeCount} · ${when}</div></div>
+        <div class="s">${esc(p.category)} · ${esc(p.authorNickname)} · ♡${p.likeCount} · ${when}</div></div>
       <div class="row__side">
         <button class="btn btn--sm" data-act="open">상세</button>
         ${p.blinded ? `<button class="btn btn--ghost btn--sm" data-act="unblind">해제</button>`
@@ -1194,7 +1198,7 @@
       const p = await api('GET', `/api/admin/posts/${id}`);
       m.querySelector('.modal').innerHTML = `
         <h2>${esc(p.title)}</h2>
-        <div class="card__meta" style="margin-bottom:14px"><span class="tag">${PCAT[p.category] || p.category}</span>
+        <div class="card__meta" style="margin-bottom:14px"><span class="tag">${esc(p.category)}</span>
           <span class="tag">♡ ${p.likeCount}</span>${p.blinded ? '<span class="tag tag--19">블라인드</span>' : ''}</div>
         <p class="sub">${esc(p.authorNickname)}</p>
         <div class="iq-body">${esc(p.content)}</div>

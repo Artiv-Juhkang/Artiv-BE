@@ -4,8 +4,6 @@ import com.juhkang.artiv.global.entity.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -28,9 +26,9 @@ public class Post extends BaseEntity {
     @Column(name = "author_id", nullable = false)
     private Long authorId;
 
-    @Enumerated(EnumType.STRING)
+    /** post_categories.name FK(자연키, C7) — 등록된 카테고리 이름 그대로 저장. */
     @Column(nullable = false, length = 20)
-    private PostCategory category;
+    private String category;
 
     @Column(nullable = false, length = 255)
     private String title;
@@ -53,14 +51,14 @@ public class Post extends BaseEntity {
     @Column(name = "blinded_at")
     private java.time.Instant blindedAt;
 
-    private Post(Long authorId, PostCategory category, String title, String content) {
+    private Post(Long authorId, String category, String title, String content) {
         this.authorId = authorId;
         this.category = category;
         this.title = title;
         this.content = content;
     }
 
-    public static Post create(Long authorId, PostCategory category, String title, String content) {
+    public static Post create(Long authorId, String category, String title, String content) {
         return new Post(authorId, category, title, content);
     }
 
@@ -69,7 +67,7 @@ public class Post extends BaseEntity {
     }
 
     /** 텍스트 필드 수정(작성자 전용 — 검증·권한은 서비스가 담당). */
-    public void update(PostCategory category, String title, String content) {
+    public void update(String category, String title, String content) {
         this.category = category;
         this.title = title;
         this.content = content;

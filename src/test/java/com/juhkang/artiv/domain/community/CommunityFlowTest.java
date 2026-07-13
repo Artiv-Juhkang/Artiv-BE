@@ -84,13 +84,13 @@ class CommunityFlowTest {
 
     @Test
     void 글을_이미지와_함께_작성하고_목록과_상세에서_본다() throws Exception {
-        long id = createPost(readerToken, "FANART", "내가 그린 팬아트");
+        long id = createPost(readerToken, "팬아트", "내가 그린 팬아트");
 
         mockMvc.perform(get("/api/posts").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("내가 그린 팬아트"))
-                .andExpect(jsonPath("$.content[0].category").value("FANART"))
+                .andExpect(jsonPath("$.content[0].category").value("팬아트"))
                 .andExpect(jsonPath("$.content[0].authorId").value((int) readerId));
 
         mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
@@ -104,7 +104,7 @@ class CommunityFlowTest {
 
     @Test
     void 추천을_토글하면_추천수가_변한다() throws Exception {
-        long id = createPost(readerToken, "FREE", "추천해주세요");
+        long id = createPost(readerToken, "자유", "추천해주세요");
         mockMvc.perform(post("/api/posts/" + id + "/like").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
@@ -119,7 +119,7 @@ class CommunityFlowTest {
 
     @Test
     void 댓글과_대댓글을_달고_조회한다() throws Exception {
-        long postId = createPost(readerToken, "QUESTION", "질문있어요");
+        long postId = createPost(readerToken, "질문", "질문있어요");
         String body = mockMvc.perform(post("/api/posts/" + postId + "/comments")
                         .header("Authorization", "Bearer " + otherToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"좋은 글이네요\"}"))
@@ -145,7 +145,7 @@ class CommunityFlowTest {
 
     @Test
     void 추천과_비추천은_상호배타_멱등이다() throws Exception {
-        long id = createPost(readerToken, "FREE", "평가해주세요");
+        long id = createPost(readerToken, "자유", "평가해주세요");
 
         // 추천 → likeCount 1
         mockMvc.perform(post("/api/posts/" + id + "/like").header("Authorization", "Bearer " + otherToken))
@@ -184,7 +184,7 @@ class CommunityFlowTest {
 
     @Test
     void 댓글_좋아요와_싫어요는_상호배타_멱등이다() throws Exception {
-        long postId = createPost(readerToken, "FREE", "댓글 평가");
+        long postId = createPost(readerToken, "자유", "댓글 평가");
         String body = mockMvc.perform(post("/api/posts/" + postId + "/comments")
                         .header("Authorization", "Bearer " + otherToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"제 의견은요\"}"))
@@ -214,7 +214,7 @@ class CommunityFlowTest {
                 .andExpect(jsonPath("$[0].disliked").value(true));
 
         // 다른 게시글 경로로는 대상 불일치 → 404
-        long otherPost = createPost(readerToken, "FREE", "다른 글");
+        long otherPost = createPost(readerToken, "자유", "다른 글");
         mockMvc.perform(post("/api/posts/" + otherPost + "/comments/" + commentId + "/like")
                         .header("Authorization", "Bearer " + readerToken))
                 .andExpect(status().isNotFound());
@@ -228,38 +228,38 @@ class CommunityFlowTest {
 
     @Test
     void 글_수정은_작성자만_텍스트_필드를_고친다() throws Exception {
-        long id = createPost(readerToken, "FREE", "원래 제목");
+        long id = createPost(readerToken, "자유", "원래 제목");
 
         // 타인 수정 → 403 (삭제와 달리 관리자도 불가 — 모더레이션은 블라인드로)
         mockMvc.perform(patch("/api/posts/" + id)
                         .header("Authorization", "Bearer " + otherToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"category\":\"QUESTION\",\"title\":\"탈취 시도\",\"content\":\"본문\"}"))
+                        .content("{\"category\":\"질문\",\"title\":\"탈취 시도\",\"content\":\"본문\"}"))
                 .andExpect(status().isForbidden());
 
         // 검증 실패(빈 제목) → 400
         mockMvc.perform(patch("/api/posts/" + id)
                         .header("Authorization", "Bearer " + readerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"category\":\"QUESTION\",\"title\":\"  \",\"content\":\"본문\"}"))
+                        .content("{\"category\":\"질문\",\"title\":\"  \",\"content\":\"본문\"}"))
                 .andExpect(status().isBadRequest());
 
         // 작성자 수정 → 204, 상세에 반영
         mockMvc.perform(patch("/api/posts/" + id)
                         .header("Authorization", "Bearer " + readerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"category\":\"QUESTION\",\"title\":\"고친 제목\",\"content\":\"@다른독자 고친 본문\"}"))
+                        .content("{\"category\":\"질문\",\"title\":\"고친 제목\",\"content\":\"@다른독자 고친 본문\"}"))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/posts/" + id).header("Authorization", "Bearer " + readerToken))
                 .andExpect(jsonPath("$.title").value("고친 제목"))
-                .andExpect(jsonPath("$.category").value("QUESTION"))
+                .andExpect(jsonPath("$.category").value("질문"))
                 .andExpect(jsonPath("$.content").value("@다른독자 고친 본문"));
 
         // 같은 멘션으로 재수정해도 dedupKey(POST_MENTION:{postId}:{rid})가 중복 알림을 억제한다
         mockMvc.perform(patch("/api/posts/" + id)
                         .header("Authorization", "Bearer " + readerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"category\":\"QUESTION\",\"title\":\"고친 제목2\",\"content\":\"@다른독자 또 고침\"}"))
+                        .content("{\"category\":\"질문\",\"title\":\"고친 제목2\",\"content\":\"@다른독자 또 고침\"}"))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/me/notifications").header("Authorization", "Bearer " + otherToken))
                 .andExpect(jsonPath("$.content[?(@.type == 'POST_MENTIONED')]", hasSize(1)));
@@ -267,7 +267,7 @@ class CommunityFlowTest {
 
     @Test
     void 글_삭제는_본인이나_관리자만() throws Exception {
-        long id = createPost(readerToken, "FREE", "삭제될 글");
+        long id = createPost(readerToken, "자유", "삭제될 글");
         mockMvc.perform(delete("/api/posts/" + id).header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isForbidden());
         mockMvc.perform(delete("/api/posts/" + id).header("Authorization", "Bearer " + adminToken))
@@ -278,8 +278,8 @@ class CommunityFlowTest {
 
     @Test
     void 베스트는_추천수_기준으로_필터된다() throws Exception {
-        long hot = createPost(readerToken, "RECOMMEND", "인기글");
-        createPost(readerToken, "FREE", "보통글");
+        long hot = createPost(readerToken, "추천", "인기글");
+        createPost(readerToken, "자유", "보통글");
         // best 임계치 이상 추천 — 테스트는 1추천도 best로 보이지 않게 임계치=2 가정, 여기선 sort=BEST 동작만 확인
         mockMvc.perform(post("/api/posts/" + hot + "/like").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk());

@@ -73,7 +73,7 @@ class ReportModerationTest {
 
     @Test
     void 신고_상세에_대상_게시글_내용이_보인다() throws Exception {
-        long postId = createPost("문제글", "FREE");
+        long postId = createPost("문제글", "자유");
         long reportId = reportPost(postId);
 
         mockMvc.perform(get("/api/admin/reports/" + reportId).header("Authorization", "Bearer " + adminToken))
@@ -86,7 +86,7 @@ class ReportModerationTest {
 
     @Test
     void 관리자가_신고를_처리하며_대상을_블라인드한다() throws Exception {
-        long postId = createPost("블라인드될글", "FREE");
+        long postId = createPost("블라인드될글", "자유");
         long reportId = reportPost(postId);
 
         mockMvc.perform(patch("/api/admin/reports/" + reportId + "/resolve")
@@ -101,7 +101,7 @@ class ReportModerationTest {
 
     @Test
     void 관리자가_신고를_처리하며_대상을_삭제한다() throws Exception {
-        long postId = createPost("삭제될글", "FREE");
+        long postId = createPost("삭제될글", "자유");
         long reportId = reportPost(postId);
 
         mockMvc.perform(patch("/api/admin/reports/" + reportId + "/resolve")
@@ -114,7 +114,7 @@ class ReportModerationTest {
 
     @Test
     void 신고를_대상종류와_사유로_필터링한다() throws Exception {
-        reportPost(createPost("글1", "FREE"));
+        reportPost(createPost("글1", "자유"));
         mockMvc.perform(get("/api/admin/reports").param("targetType", "POST").param("reason", "ABUSE")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
@@ -126,15 +126,15 @@ class ReportModerationTest {
 
     @Test
     void 커뮤니티_관리에서_키워드와_카테고리로_검색하고_상세를_본다() throws Exception {
-        long id = createPost("회귀 무신 추천", "RECOMMEND");
-        createPost("일상 잡담", "FREE");
+        long id = createPost("회귀 무신 추천", "추천");
+        createPost("일상 잡담", "자유");
 
         mockMvc.perform(get("/api/admin/posts").param("keyword", "회귀")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("회귀 무신 추천"));
-        mockMvc.perform(get("/api/admin/posts").param("category", "FREE")
+        mockMvc.perform(get("/api/admin/posts").param("category", "자유")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(jsonPath("$.totalElements").value(1));
 

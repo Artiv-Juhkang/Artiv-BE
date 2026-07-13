@@ -18,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.juhkang.artiv.TestcontainersConfiguration;
-import com.juhkang.artiv.domain.community.PostCategory;
 import com.juhkang.artiv.domain.community.PostCommentService;
 import com.juhkang.artiv.domain.community.PostService;
 import com.juhkang.artiv.domain.episode.Episode;
@@ -67,7 +66,7 @@ class NotificationTriggerTest {
     void 타인이_내_글에_댓글을_달면_글쓴이에게_알림() {
         Long author = user("작가A", Role.CREATOR);
         Long commenter = user("독자A", Role.READER);
-        Long postId = postService.create(author, PostCategory.FREE, "제목", "내용", null);
+        Long postId = postService.create(author, "자유", "제목", "내용", null);
 
         postCommentService.write(commenter, postId, "잘 봤어요", null);
 
@@ -82,7 +81,7 @@ class NotificationTriggerTest {
     @Test
     void 내_글에_내가_댓글을_달면_알림_없음() {
         Long author = user("작가B", Role.CREATOR);
-        Long postId = postService.create(author, PostCategory.FREE, "제목", "내용", null);
+        Long postId = postService.create(author, "자유", "제목", "내용", null);
         postCommentService.write(author, postId, "자답", null);
         assertThat(notis(author)).isEmpty();
     }
@@ -93,7 +92,7 @@ class NotificationTriggerTest {
         Long author = user("작가C", Role.CREATOR);
         Long parentWriter = user("독자C", Role.READER);
         Long replier = user("독자C2", Role.READER);
-        Long postId = postService.create(author, PostCategory.FREE, "제목", "내용", null);
+        Long postId = postService.create(author, "자유", "제목", "내용", null);
         var parent = postCommentService.write(parentWriter, postId, "원댓글", null);
 
         postCommentService.write(replier, postId, "답글", parent.id());
@@ -126,7 +125,7 @@ class NotificationTriggerTest {
     void 게시글_본문에서_멘션하면_언급된_사용자에게_알림() {
         Long author = user("작가E", Role.CREATOR);
         Long mentioned = user("멘션이", Role.READER);
-        postService.create(author, PostCategory.FREE, "제목", "안녕 @멘션이 이거 봐줘", null);
+        postService.create(author, "자유", "제목", "안녕 @멘션이 이거 봐줘", null);
 
         List<Notification> n = notis(mentioned);
         assertThat(n).hasSize(1);
@@ -139,7 +138,7 @@ class NotificationTriggerTest {
         Long author = user("작가F", Role.CREATOR);
         Long commenter = user("독자F", Role.READER);
         Long mentioned = user("멘션F", Role.READER);
-        Long postId = postService.create(author, PostCategory.FREE, "제목", "내용", null);
+        Long postId = postService.create(author, "자유", "제목", "내용", null);
 
         postCommentService.write(commenter, postId, "@멘션F 이거 봤어?", null);
 
@@ -155,7 +154,7 @@ class NotificationTriggerTest {
         Long author = user("작가NFD", Role.CREATOR);
         Long mentioned = user("철수정", Role.READER);  // 소스 리터럴은 NFC로 저장됨
         String nfd = Normalizer.normalize("좋아요 @철수정 봐줘", Normalizer.Form.NFD);  // 본문은 NFD(분해형)
-        postService.create(author, PostCategory.FREE, "제목", nfd, null);
+        postService.create(author, "자유", "제목", nfd, null);
 
         assertThat(notis(mentioned)).hasSize(1);
         assertThat(notis(mentioned).get(0).getType()).isEqualTo(NotificationType.POST_MENTIONED);
@@ -164,7 +163,7 @@ class NotificationTriggerTest {
     @Test
     void 존재하지_않는_닉네임_멘션은_무시되고_자기_멘션은_제외() {
         Long author = user("작가G", Role.CREATOR);
-        postService.create(author, PostCategory.FREE, "제목", "@없는닉네임999 @작가G 본인멘션", null);
+        postService.create(author, "자유", "제목", "@없는닉네임999 @작가G 본인멘션", null);
         assertThat(notis(author)).isEmpty(); // 자기 멘션 제외 + 미존재 닉 무시
     }
 

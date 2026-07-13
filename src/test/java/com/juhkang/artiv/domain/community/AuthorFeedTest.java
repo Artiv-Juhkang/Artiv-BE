@@ -47,7 +47,7 @@ class AuthorFeedTest {
     }
 
     private Long post(Long authorId, String title, boolean blinded) {
-        Post p = Post.create(authorId, PostCategory.FREE, title, "내용");
+        Post p = Post.create(authorId, "자유", title, "내용");
         if (blinded) {
             p.blind(999L);
         }

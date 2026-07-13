@@ -59,7 +59,7 @@ class ReportFlowTest {
     private long createPost() throws Exception {
         String body = mockMvc.perform(multipart("/api/posts")
                         .header("Authorization", "Bearer " + posterToken)
-                        .param("category", "FREE").param("title", "신고 대상 글").param("content", "내용"))
+                        .param("category", "자유").param("title", "신고 대상 글").param("content", "내용"))
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(body, "$.id")).longValue();
     }

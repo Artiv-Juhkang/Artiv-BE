@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.artiv.TestcontainersConfiguration;
 import com.juhkang.artiv.domain.auth.JwtProvider;
 import com.juhkang.artiv.domain.community.Post;
-import com.juhkang.artiv.domain.community.PostCategory;
 import com.juhkang.artiv.domain.community.PostComment;
 import com.juhkang.artiv.domain.community.PostCommentRepository;
 import com.juhkang.artiv.domain.community.PostLike;
@@ -98,10 +97,10 @@ class LibraryActivityFlowTest {
         User author = userRepository.findById(user("정렬작가", Role.CREATOR)).orElseThrow();
         Series series = seriesRepository.save(Series.create("정렬물", "설명", author, AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY)));
         readLogRepository.save(ReadLog.create(me, episodeRepository.save(Episode.create(series, 1, "1화", EpisodeStatus.PUBLISHED, Instant.now()))));
-        postRepository.save(Post.create(meId, PostCategory.FREE, "글", "내용"));
-        postLikeRepository.save(PostLike.create(meId, postRepository.save(Post.create(meId, PostCategory.FREE, "추천글", "내용")).getId()));
+        postRepository.save(Post.create(meId, "자유", "글", "내용"));
+        postLikeRepository.save(PostLike.create(meId, postRepository.save(Post.create(meId, "자유", "추천글", "내용")).getId()));
         postCommentRepository.save(PostComment.create(
-                postRepository.save(Post.create(meId, PostCategory.FREE, "원글", "내용")).getId(), meId, null, "댓글"));
+                postRepository.save(Post.create(meId, "자유", "원글", "내용")).getId(), meId, null, "댓글"));
 
         // group-by 비호환(createdAt)·미존재 컬럼(garbage)·유효 컬럼(seriesId) 모두 200(클라 sort 무시, 고정 정렬)
         for (String sort : new String[] {"createdAt,desc", "garbage,desc", "seriesId,asc"}) {
@@ -114,11 +113,11 @@ class LibraryActivityFlowTest {
 
     @Test
     void 내가_쓴_글은_블라인드_포함_플래그와_함께_본인_것만_보인다() throws Exception {
-        postRepository.save(Post.create(meId, PostCategory.FREE, "내 글", "내용"));
-        Post blinded = Post.create(meId, PostCategory.FREE, "내 블라인드 글", "내용");
+        postRepository.save(Post.create(meId, "자유", "내 글", "내용"));
+        Post blinded = Post.create(meId, "자유", "내 블라인드 글", "내용");
         blinded.blind(999L);
         postRepository.save(blinded);
-        postRepository.save(Post.create(user("서재타인", Role.READER), PostCategory.FREE, "남의 글", "내용"));
+        postRepository.save(Post.create(user("서재타인", Role.READER), "자유", "남의 글", "내용"));
 
         mockMvc.perform(get("/api/me/posts").header("Authorization", "Bearer " + meToken))
                 .andExpect(status().isOk())
@@ -128,7 +127,7 @@ class LibraryActivityFlowTest {
 
     @Test
     void 내_댓글은_원글_제목과_함께_보인다() throws Exception {
-        Long postId = postRepository.save(Post.create(user("글쓴이L", Role.READER), PostCategory.FREE, "원글 제목", "내용")).getId();
+        Long postId = postRepository.save(Post.create(user("글쓴이L", Role.READER), "자유", "원글 제목", "내용")).getId();
         postCommentRepository.save(PostComment.create(postId, meId, null, "내 댓글"));
 
         mockMvc.perform(get("/api/me/post-comments").header("Authorization", "Bearer " + meToken))
@@ -141,8 +140,8 @@ class LibraryActivityFlowTest {
 
     @Test
     void 추천한_글_목록은_블라인드_글을_제외한다() throws Exception {
-        Long pub = postRepository.save(Post.create(user("작가P", Role.READER), PostCategory.FREE, "공개 글", "내용")).getId();
-        Post blindedPost = Post.create(user("작가Q", Role.READER), PostCategory.FREE, "블라인드 글", "내용");
+        Long pub = postRepository.save(Post.create(user("작가P", Role.READER), "자유", "공개 글", "내용")).getId();
+        Post blindedPost = Post.create(user("작가Q", Role.READER), "자유", "블라인드 글", "내용");
         blindedPost.blind(999L);
         Long blindId = postRepository.save(blindedPost).getId();
         postLikeRepository.save(PostLike.create(meId, pub));
@@ -158,7 +157,7 @@ class LibraryActivityFlowTest {
 
     @Test
     void 활동내역은_본인_것만_보인다_IDOR() throws Exception {
-        postRepository.save(Post.create(meId, PostCategory.FREE, "내 글", "내용"));
+        postRepository.save(Post.create(meId, "자유", "내 글", "내용"));
         // 다른 사용자가 조회하면 내 글이 보이지 않는다
         mockMvc.perform(get("/api/me/posts").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk())

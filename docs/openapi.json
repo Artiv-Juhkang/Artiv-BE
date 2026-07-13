@@ -753,8 +753,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           }
         }, {
           "name" : "sort",
@@ -794,8 +793,7 @@
           "in" : "query",
           "required" : true,
           "schema" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           }
         }, {
           "name" : "title",
@@ -1093,6 +1091,53 @@
         }
       }
     },
+    "/api/post-categories" : {
+      "get" : {
+        "tags" : [ "post-category-controller" ],
+        "operationId" : "list_5",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PostCategoryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "post-category-controller" ],
+        "operationId" : "create_2",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PostCategoryCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PostCategoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/inquiries" : {
       "get" : {
         "tags" : [ "inquiry-controller" ],
@@ -1120,7 +1165,7 @@
       },
       "post" : {
         "tags" : [ "inquiry-controller" ],
-        "operationId" : "create_2",
+        "operationId" : "create_3",
         "parameters" : [ {
           "name" : "type",
           "in" : "query",
@@ -1179,7 +1224,7 @@
     "/api/conversations" : {
       "post" : {
         "tags" : [ "chat-controller" ],
-        "operationId" : "create_3",
+        "operationId" : "create_4",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -2976,7 +3021,7 @@
     "/api/admin/reports" : {
       "get" : {
         "tags" : [ "admin-report-controller" ],
-        "operationId" : "list_5",
+        "operationId" : "list_6",
         "parameters" : [ {
           "name" : "status",
           "in" : "query",
@@ -3053,14 +3098,13 @@
     "/api/admin/posts" : {
       "get" : {
         "tags" : [ "admin-post-controller" ],
-        "operationId" : "list_6",
+        "operationId" : "list_7",
         "parameters" : [ {
           "name" : "category",
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           }
         }, {
           "name" : "keyword",
@@ -3128,7 +3172,7 @@
     "/api/admin/inquiries" : {
       "get" : {
         "tags" : [ "admin-inquiry-controller" ],
-        "operationId" : "list_7",
+        "operationId" : "list_8",
         "parameters" : [ {
           "name" : "type",
           "in" : "query",
@@ -3215,7 +3259,7 @@
     "/api/admin/creator-requests" : {
       "get" : {
         "tags" : [ "admin-creator-request-controller" ],
-        "operationId" : "list_8",
+        "operationId" : "list_9",
         "parameters" : [ {
           "name" : "status",
           "in" : "query",
@@ -3525,6 +3569,29 @@
           }
         }
       },
+      "PostCategoryCreateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 20,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "PostCategoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "ConversationCreateRequest" : {
         "type" : "object",
         "properties" : {
@@ -3810,8 +3877,7 @@
         "type" : "object",
         "properties" : {
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -4670,8 +4736,7 @@
             "format" : "int64"
           },
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -4705,8 +4770,7 @@
             "format" : "int64"
           },
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -4874,8 +4938,7 @@
             "format" : "int64"
           },
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -5415,8 +5478,7 @@
             "format" : "int64"
           },
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"
@@ -5445,8 +5507,7 @@
             "format" : "int64"
           },
           "category" : {
-            "type" : "string",
-            "enum" : [ "RECOMMEND", "FREE", "FANART", "QUESTION" ]
+            "type" : "string"
           },
           "title" : {
             "type" : "string"

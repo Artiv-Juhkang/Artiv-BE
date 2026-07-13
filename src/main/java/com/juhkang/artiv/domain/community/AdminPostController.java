@@ -29,7 +29,7 @@ public class AdminPostController {
     private final PostService postService;
 
     @GetMapping
-    public PageResponse<PostAdminResponse> list(@RequestParam(required = false) PostCategory category,
+    public PageResponse<PostAdminResponse> list(@RequestParam(required = false) String category,
                                                 @RequestParam(required = false) String keyword,
                                                 @RequestParam(required = false) Boolean blinded,
                                                 @PageableDefault(size = 30) Pageable pageable) {

@@ -40,7 +40,7 @@ public class PostController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public IdResponse create(@AuthenticationPrincipal Long userId,
-                             @RequestParam PostCategory category,
+                             @RequestParam String category,
                              @RequestParam String title,
                              @RequestParam String content,
                              @RequestPart(name = "images", required = false) List<MultipartFile> images) {
@@ -48,7 +48,7 @@ public class PostController {
     }
 
     @GetMapping
-    public PageResponse<PostResponse> list(@RequestParam(required = false) PostCategory category,
+    public PageResponse<PostResponse> list(@RequestParam(required = false) String category,
                                            @RequestParam(defaultValue = "LATEST") PostSort sort,
                                            @PageableDefault(size = 20) Pageable pageable) {
         return postService.getList(category, sort, pageable);
