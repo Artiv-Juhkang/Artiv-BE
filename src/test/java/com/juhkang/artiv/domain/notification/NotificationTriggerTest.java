@@ -100,8 +100,10 @@ class NotificationTriggerTest {
         List<Notification> n = notis(parentWriter);
         assertThat(n).hasSize(1);
         assertThat(n.get(0).getType()).isEqualTo(NotificationType.COMMENT_REPLY);
-        assertThat(n.get(0).getTargetType()).isEqualTo(NotificationTargetType.COMMENT);
-        assertThat(n.get(0).getTargetId()).isEqualTo(parent.id());
+        // 알림 목적지는 원글(POST)·postId — 프론트가 게시글 상세로 딥링크할 수 있게(F7).
+        // 댓글 id를 targetId로 두면 원글을 알 수 없어 라우팅이 데드엔드가 된다.
+        assertThat(n.get(0).getTargetType()).isEqualTo(NotificationTargetType.POST);
+        assertThat(n.get(0).getTargetId()).isEqualTo(postId);
     }
 
     // ③ FOLLOWED

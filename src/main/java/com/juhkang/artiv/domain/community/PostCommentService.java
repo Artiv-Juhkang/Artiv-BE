@@ -56,8 +56,10 @@ public class PostCommentService {
                         rid -> "POST_CMT:" + saved.getId());
             }
         } else if (!parent.parentAuthorId().equals(userId)) {  // ② 대댓글 → 부모 댓글 작성자
+            // 목적지는 원글(POST)·postId — 프론트가 게시글 상세로 딥링크할 수 있게(F7). 댓글 id를
+            // 넘기면 원글을 못 찾아 알림 라우팅이 데드엔드가 된다.
             notificationService.fanOut(List.of(parent.parentAuthorId()), NotificationType.COMMENT_REPLY,
-                    NotificationTargetType.COMMENT, parent.effectiveParentId(), userId, "새 답글",
+                    NotificationTargetType.POST, postId, userId, "새 답글",
                     "회원님의 댓글에 답글이 달렸어요.", rid -> "CMT_REPLY:" + saved.getId());
         }
         notifyMentions(content, userId, postId, saved.getId());  // ④ 댓글 본문 멘션
