@@ -269,10 +269,12 @@ class ChatFlowTest {
                         .content("{\"content\":\"반가워요\"}"))
                 .andExpect(status().isCreated());
 
-        // 인박스에 GROUP 표시명=title, 메시지가 도착한 순으로 보인다.
+        // 인박스에 GROUP 표시명=title, 인원수(본인+2=3), 비익명. 메시지 도착 순으로 보인다.
         mockMvc.perform(get("/api/me/conversations").header("Authorization", "Bearer " + aToken))
                 .andExpect(jsonPath("$[0].displayName").value("우리끼리"))
                 .andExpect(jsonPath("$[0].type").value("GROUP"))
+                .andExpect(jsonPath("$[0].memberCount").value(3))
+                .andExpect(jsonPath("$[0].anonymous").value(false))
                 .andExpect(jsonPath("$[0].lastMessage").value("반가워요"));
     }
 
@@ -305,6 +307,11 @@ class ChatFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].senderNickname").value("익명2"))
                 .andExpect(jsonPath("$.content[0].senderId").value(bId));
+
+        // 인박스 요약도 익명방임을 알려준다(FE가 익명 배지·인원수를 표시할 수 있게).
+        mockMvc.perform(get("/api/me/conversations").header("Authorization", "Bearer " + aToken))
+                .andExpect(jsonPath("$[0].anonymous").value(true))
+                .andExpect(jsonPath("$[0].memberCount").value(3));
     }
 
     @Test

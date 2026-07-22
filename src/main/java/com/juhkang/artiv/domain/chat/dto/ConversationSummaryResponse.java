@@ -13,6 +13,8 @@ public record ConversationSummaryResponse(
         Long id,
         ConversationType type,
         ConversationStatus status,
+        boolean anonymous,
+        int memberCount,
         String displayName,
         Long partnerId,
         String partnerAvatarUrl,

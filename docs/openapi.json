@@ -5257,6 +5257,13 @@
             "type" : "string",
             "enum" : [ "PENDING", "ACCEPTED", "DECLINED" ]
           },
+          "anonymous" : {
+            "type" : "boolean"
+          },
+          "memberCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "displayName" : {
             "type" : "string"
           },

@@ -236,9 +236,13 @@ public class ChatService {
         List<Long> ids = conversations.stream().map(Conversation::getId).toList();
 
         // 배치 3쿼리(멤버·마지막 메시지·미읽음) + 닉네임 1쿼리 — 인박스 N+1 없음.
-        Map<Long, Long> partnerByConv = memberRepository.findByConversationIdIn(ids).stream()
+        List<ConversationMember> allMembers = memberRepository.findByConversationIdIn(ids);
+        Map<Long, Long> partnerByConv = allMembers.stream()
                 .filter(m -> !m.getUserId().equals(userId))
                 .collect(Collectors.toMap(ConversationMember::getConversationId, ConversationMember::getUserId, (a, b) -> a));
+        // 방별 총 인원수(그룹 배지용) — 같은 배치 쿼리를 재사용.
+        Map<Long, Long> memberCountByConv = allMembers.stream()
+                .collect(Collectors.groupingBy(ConversationMember::getConversationId, Collectors.counting()));
         Map<Long, Message> latestByConv = messageRepository.findLatestByConversationIds(ids).stream()
                 .collect(Collectors.toMap(Message::getConversationId, m -> m));
         Map<Long, Long> unreadByConv = new HashMap<>();
@@ -263,8 +267,10 @@ public class ChatService {
                             ? imageStorageService.urlFor(partner.getAvatarKey())
                             : null;
                     Message latest = latestByConv.get(c.getId());
+                    int memberCount = memberCountByConv.getOrDefault(c.getId(), 0L).intValue();
                     return new ConversationSummaryResponse(
-                            c.getId(), c.getType(), c.getStatus(), displayName, partnerId, avatarUrl,
+                            c.getId(), c.getType(), c.getStatus(), c.isAnonymous(), memberCount,
+                            displayName, partnerId, avatarUrl,
                             latest != null ? latest.getContent() : null,
                             latest != null ? latest.getCreatedAt() : null,
                             unreadByConv.getOrDefault(c.getId(), 0L));
