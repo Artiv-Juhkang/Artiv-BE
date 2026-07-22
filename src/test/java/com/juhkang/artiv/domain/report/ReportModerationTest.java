@@ -100,6 +100,30 @@ class ReportModerationTest {
     }
 
     @Test
+    void 블라인드된_글의_댓글_목록도_상세와_동일하게_404다() throws Exception {
+        long postId = createPost("댓글달린글", "자유");
+        // 블라인드 전 댓글을 하나 달아둔다
+        mockMvc.perform(post("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + reporterToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"댓글입니다\"}"))
+                .andExpect(status().isCreated());
+
+        long reportId = reportPost(postId);
+        mockMvc.perform(patch("/api/admin/reports/" + reportId + "/resolve")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"BLIND_TARGET\"}"))
+                .andExpect(status().isOk());
+
+        // 상세가 404인데 댓글 목록만 200으로 새면 비대칭(F6) — 둘 다 404여야 한다
+        mockMvc.perform(get("/api/posts/" + postId).header("Authorization", "Bearer " + reporterToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + reporterToken))
+                .andExpect(status().isNotFound());
+        // 관리자는 모더레이션 위해 여전히 볼 수 있다
+        mockMvc.perform(get("/api/posts/" + postId + "/comments").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void 관리자가_신고를_처리하며_대상을_삭제한다() throws Exception {
         long postId = createPost("삭제될글", "자유");
         long reportId = reportPost(postId);

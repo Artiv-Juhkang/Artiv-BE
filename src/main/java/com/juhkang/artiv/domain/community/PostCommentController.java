@@ -38,8 +38,9 @@ public class PostCommentController {
     }
 
     @GetMapping
-    public List<PostCommentResponse> list(@AuthenticationPrincipal Long userId, @PathVariable Long postId) {
-        return postCommentService.getComments(postId, userId);
+    public List<PostCommentResponse> list(@AuthenticationPrincipal Long userId, @PathVariable Long postId,
+                                          Authentication authentication) {
+        return postCommentService.getComments(postId, userId, AuthSupport.isAdmin(authentication));
     }
 
     @PostMapping("/{commentId}/like")

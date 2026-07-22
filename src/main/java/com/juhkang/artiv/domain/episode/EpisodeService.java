@@ -14,6 +14,7 @@ import com.juhkang.artiv.domain.episode.dto.EpisodeDetailResponse;
 import com.juhkang.artiv.domain.episode.dto.EpisodeImageResponse;
 import com.juhkang.artiv.domain.episode.access.AccessResult;
 import com.juhkang.artiv.domain.episode.access.EpisodeAccessEvaluator;
+import com.juhkang.artiv.domain.episode.access.EpisodeAccessGuard;
 import com.juhkang.artiv.domain.episode.dto.EpisodeSummaryResponse;
 import com.juhkang.artiv.domain.notification.NotificationService;
 import com.juhkang.artiv.domain.comment.CommentRepository;
@@ -22,7 +23,6 @@ import com.juhkang.artiv.domain.notification.NotificationType;
 import com.juhkang.artiv.domain.personalization.SubscriptionRepository;
 import com.juhkang.artiv.domain.series.AgeRating;
 import com.juhkang.artiv.domain.series.Series;
-import com.juhkang.artiv.domain.series.SeriesAccessChecker;
 import com.juhkang.artiv.domain.series.SeriesRepository;
 import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
@@ -39,21 +39,26 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class EpisodeService {
 
+    private static final int MAX_TITLE = 255;
+
     private final EpisodeRepository episodeRepository;
     private final EpisodeImageRepository episodeImageRepository;
     private final EpisodeLikeRepository episodeLikeRepository;
     private final SeriesRepository seriesRepository;
-    private final SeriesAccessChecker seriesAccessChecker;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
     private final MediaStorageService mediaStorageService;
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationService notificationService;
     private final EpisodeAccessEvaluator episodeAccessEvaluator;
+    private final EpisodeAccessGuard episodeAccessGuard;
     private final CommentRepository commentRepository;
 
     @Transactional
     public int upload(Long userId, Long seriesId, String title, Instant publishAt, List<MultipartFile> images) {
+        if (title == null || title.isBlank() || title.strip().length() > MAX_TITLE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT); // 빈 제목·255자 초과 차단(F12)
+        }
         Series series = seriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
         if (!series.getAuthor().getId().equals(userId)) {
@@ -131,7 +136,8 @@ public class EpisodeService {
         // 목록은 PUBLISHED만 조회 → publishAt non-null 보장(쿼리를 PUBLISHED+SCHEDULED로 바꾸면 evaluate 재검토 필요).
         // 최신 회차부터 내림차순(프론트 회차 목록 기본이 '최신화부터' — 새 회차/UP가 최상단).
         Slice<EpisodeSummaryResponse> slice = episodeRepository
-                .findBySeriesIdAndStatusOrderByEpisodeNoDesc(seriesId, EpisodeStatus.PUBLISHED, pageable)
+                .findBySeriesIdAndStatusOrderByEpisodeNoDesc(seriesId, EpisodeStatus.PUBLISHED,
+                        com.juhkang.artiv.global.dto.Pageables.pageOnly(pageable))
                 .map(ep -> EpisodeSummaryResponse.of(ep, episodeAccessEvaluator.evaluate(series, ep, viewerId, canPreview, now)));
         return SliceResponse.from(slice);
     }
@@ -170,7 +176,7 @@ public class EpisodeService {
     public void like(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
-        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
+        episodeAccessGuard.verifyInteractable(episode.getSeries(), episode, userId); // 미발행·잠긴 회차 좋아요 차단(F13)
         if (episodeLikeRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 좋아요면 그대로
         }

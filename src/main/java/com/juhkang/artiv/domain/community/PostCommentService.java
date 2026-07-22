@@ -94,7 +94,13 @@ public class PostCommentService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
-    public List<PostCommentResponse> getComments(Long postId, Long viewerId) {
+    public List<PostCommentResponse> getComments(Long postId, Long viewerId, boolean isAdmin) {
+        // 블라인드된 글은 상세가 404를 주므로 댓글 목록도 동일하게 존재를 숨긴다(관리자는 모더레이션 위해 예외 — F6).
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (post.isBlinded() && !isAdmin) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
         List<PostComment> all = postCommentRepository.findByPostIdAndBlindedFalseOrderByIdAsc(postId);
         List<Long> commentIds = all.stream().map(PostComment::getId).toList();
         Set<Long> likedIds = commentIds.isEmpty() ? Set.of()

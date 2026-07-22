@@ -15,9 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.artiv.domain.comment.dto.CommentResponse;
 import com.juhkang.artiv.domain.episode.Episode;
 import com.juhkang.artiv.domain.episode.EpisodeRepository;
+import com.juhkang.artiv.domain.episode.access.EpisodeAccessGuard;
 import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -32,11 +34,14 @@ public class CommentService {
     private final CommentLikeRepository commentLikeRepository;
     private final EpisodeRepository episodeRepository;
     private final UserRepository userRepository;
+    private final EpisodeAccessGuard episodeAccessGuard;
 
     @Transactional
     public Long write(Long userId, Long seriesId, int episodeNo, String content, Long parentId) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        // 회차 상세와 동일한 접근 가드 — 비공개·19금·미발행·잠긴 회차 댓글 작성 차단(F5).
+        episodeAccessGuard.verifyInteractable(episode.getSeries(), episode, userId);
         User user = userRepository.getReferenceById(userId);
         Long resolvedParentId = resolveParentId(parentId, episode.getId());
         return commentRepository.save(Comment.create(user, episode, content, resolvedParentId)).getId();
@@ -58,8 +63,11 @@ public class CommentService {
     public PageResponse<CommentResponse> getComments(Long seriesId, int episodeNo, Long viewerId, Pageable pageable) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        // 회차 상세와 동일한 접근 가드 — 열람 불가한 회차의 댓글은 목록도 막는다(F5).
+        episodeAccessGuard.verifyInteractable(episode.getSeries(), episode, viewerId);
 
-        Page<Comment> parents = commentRepository.findByEpisodeIdAndParentIdIsNull(episode.getId(), pageable);
+        Page<Comment> parents = commentRepository.findByEpisodeIdAndParentIdIsNull(episode.getId(),
+                Pageables.pageOnly(pageable));
         List<Long> parentIds = parents.getContent().stream().map(Comment::getId).toList();
         List<Comment> replies = parentIds.isEmpty()
                 ? List.of()
@@ -94,25 +102,35 @@ public class CommentService {
     }
 
     @Transactional
-    public void like(Long userId, Long commentId) {
-        if (!commentRepository.existsById(commentId)) {
-            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
-        }
-        if (commentLikeRepository.existsByUserIdAndCommentId(userId, commentId)) {
+    public void like(Long userId, Long seriesId, int episodeNo, Long commentId) {
+        Comment comment = loadInEpisode(commentId, seriesId, episodeNo);
+        if (commentLikeRepository.existsByUserIdAndCommentId(userId, comment.getId())) {
             return; // 멱등
         }
-        commentLikeRepository.save(CommentLike.create(userId, commentId));
+        commentLikeRepository.save(CommentLike.create(userId, comment.getId()));
     }
 
     @Transactional
-    public void unlike(Long userId, Long commentId) {
-        commentLikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+    public void unlike(Long userId, Long seriesId, int episodeNo, Long commentId) {
+        Comment comment = loadInEpisode(commentId, seriesId, episodeNo);
+        commentLikeRepository.deleteByUserIdAndCommentId(userId, comment.getId());
     }
 
-    @Transactional
-    public void delete(Long userId, boolean isAdmin, Long commentId) {
+    /** 경로의 seriesId·episodeNo에 실제로 속한 댓글만 로드(다른 회차 경로로 위조 시 404 — F17). */
+    private Comment loadInEpisode(Long commentId, Long seriesId, int episodeNo) {
+        Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
+        if (!comment.getEpisode().getId().equals(episode.getId())) {
+            throw new BusinessException(ErrorCode.ENTITY_NOT_FOUND);
+        }
+        return comment;
+    }
+
+    @Transactional
+    public void delete(Long userId, boolean isAdmin, Long seriesId, int episodeNo, Long commentId) {
+        Comment comment = loadInEpisode(commentId, seriesId, episodeNo);
         // 삭제 권한: 작성자 본인 또는 ADMIN
         if (!comment.isOwnedBy(userId) && !isAdmin) {
             throw new BusinessException(ErrorCode.FORBIDDEN);

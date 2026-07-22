@@ -593,6 +593,22 @@
         "tags" : [ "comment-controller" ],
         "operationId" : "like_1",
         "parameters" : [ {
+          "name" : "seriesId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "episodeNo",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
           "name" : "commentId",
           "in" : "path",
           "required" : true,
@@ -611,6 +627,22 @@
         "tags" : [ "comment-controller" ],
         "operationId" : "unlike_1",
         "parameters" : [ {
+          "name" : "seriesId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "episodeNo",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
           "name" : "commentId",
           "in" : "path",
           "required" : true,
@@ -3295,6 +3327,22 @@
         "tags" : [ "comment-controller" ],
         "operationId" : "delete_3",
         "parameters" : [ {
+          "name" : "seriesId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "episodeNo",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
           "name" : "commentId",
           "in" : "path",
           "required" : true,

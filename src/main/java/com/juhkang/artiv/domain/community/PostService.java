@@ -194,7 +194,7 @@ public class PostService {
     // ---- 관리자 ----
     public PageResponse<PostAdminResponse> getForAdmin(String category, String keyword, Boolean blinded, Pageable pageable) {
         String kw = (keyword != null && !keyword.isBlank()) ? keyword.strip() : null;
-        Page<Post> page = postRepository.findForAdmin(category, kw, blinded, pageable);
+        Page<Post> page = postRepository.findForAdmin(category, kw, blinded, Pageables.pageOnly(pageable));
         Map<Long, String> names = nicknames(page.getContent());
         return PageResponse.from(page.map(p -> new PostAdminResponse(p.getId(), p.getCategory(), p.getTitle(),
                 names.getOrDefault(p.getAuthorId(), "(탈퇴)"), p.getLikeCount(), p.isBlinded(), p.getCreatedAt())));

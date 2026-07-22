@@ -19,6 +19,7 @@ import com.juhkang.artiv.domain.report.dto.ReportAdminResponse;
 import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -76,7 +77,7 @@ public class ReportService {
 
     public PageResponse<ReportAdminResponse> getForAdmin(ReportStatus status, ReportTargetType targetType,
                                                          ReportReason reason, Pageable pageable) {
-        Page<Report> page = reportRepository.findForAdmin(status, targetType, reason, pageable);
+        Page<Report> page = reportRepository.findForAdmin(status, targetType, reason, Pageables.pageOnly(pageable));
         return PageResponse.from(page.map(r -> ReportAdminResponse.of(r, nickname(r.getReporterId()))));
     }
 

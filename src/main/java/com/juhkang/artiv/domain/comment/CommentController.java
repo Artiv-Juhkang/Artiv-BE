@@ -49,21 +49,23 @@ public class CommentController {
 
     @PostMapping("/{commentId}/like")
     @ResponseStatus(HttpStatus.CREATED)
-    public void like(@AuthenticationPrincipal Long userId, @PathVariable Long commentId) {
-        commentService.like(userId, commentId);
+    public void like(@AuthenticationPrincipal Long userId,
+                     @PathVariable Long seriesId, @PathVariable int episodeNo, @PathVariable Long commentId) {
+        commentService.like(userId, seriesId, episodeNo, commentId);
     }
 
     @DeleteMapping("/{commentId}/like")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void unlike(@AuthenticationPrincipal Long userId, @PathVariable Long commentId) {
-        commentService.unlike(userId, commentId);
+    public void unlike(@AuthenticationPrincipal Long userId,
+                       @PathVariable Long seriesId, @PathVariable int episodeNo, @PathVariable Long commentId) {
+        commentService.unlike(userId, seriesId, episodeNo, commentId);
     }
 
     @DeleteMapping("/{commentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal Long userId,
-                       @PathVariable Long commentId,
+                       @PathVariable Long seriesId, @PathVariable int episodeNo, @PathVariable Long commentId,
                        Authentication authentication) {
-        commentService.delete(userId, AuthSupport.isAdmin(authentication), commentId);
+        commentService.delete(userId, AuthSupport.isAdmin(authentication), seriesId, episodeNo, commentId);
     }
 }

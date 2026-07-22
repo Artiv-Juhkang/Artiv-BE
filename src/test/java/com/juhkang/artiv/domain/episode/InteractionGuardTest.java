@@ -56,6 +56,8 @@ class InteractionGuardTest {
     private String otherToken;
     private Long adultSeriesId;
     private Long hiddenSeriesId;
+    private Long lockedSeriesId;
+    private Long scheduledSeriesId;
 
     @BeforeEach
     void setUp() {
@@ -75,6 +77,18 @@ class InteractionGuardTest {
         hidden.changeVisibility(false);
         hiddenSeriesId = seriesRepository.save(hidden).getId();
         episodeRepository.save(Episode.create(hidden, 1, "1화", EpisodeStatus.PUBLISHED, Instant.now()));
+
+        Series locked = Series.create(
+                "기다리면무료작", "", creator, AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY));
+        locked.changeReleasePolicy(com.juhkang.artiv.domain.series.ReleasePolicy.WAIT_FREE, 7);
+        lockedSeriesId = seriesRepository.save(locked).getId();
+        episodeRepository.save(Episode.create(locked, 1, "1화", EpisodeStatus.PUBLISHED, Instant.now())); // 방금 발행 → 잠김
+
+        Series scheduled = seriesRepository.save(Series.create(
+                "예약작", "", creator, AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY)));
+        scheduledSeriesId = scheduled.getId();
+        episodeRepository.save(Episode.create(scheduled, 1, "1화", EpisodeStatus.SCHEDULED,
+                Instant.now().plusSeconds(86_400)));
     }
 
     @Test
@@ -104,6 +118,30 @@ class InteractionGuardTest {
     @Test
     void 타인은_비공개작품_회차에_좋아요할_수_없다_404() throws Exception {
         mockMvc.perform(post("/api/series/" + hiddenSeriesId + "/episodes/1/like")
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 잠긴_기다리면무료_회차에는_좋아요_북마크할_수_없다_403() throws Exception {
+        mockMvc.perform(post("/api/series/" + lockedSeriesId + "/episodes/1/like")
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mockMvc.perform(post("/api/series/" + lockedSeriesId + "/episodes/1/bookmark")
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 미발행_회차에는_좋아요_북마크_읽음처리할_수_없다_404() throws Exception {
+        mockMvc.perform(post("/api/series/" + scheduledSeriesId + "/episodes/1/like")
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/series/" + scheduledSeriesId + "/episodes/1/bookmark")
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/series/" + scheduledSeriesId + "/episodes/1/read")
                         .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());
     }

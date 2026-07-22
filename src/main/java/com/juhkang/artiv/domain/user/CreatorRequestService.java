@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.artiv.domain.user.dto.CreatorRequestAdminResponse;
 import com.juhkang.artiv.domain.user.dto.CreatorRequestResponse;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -40,9 +41,10 @@ public class CreatorRequestService {
     }
 
     public PageResponse<CreatorRequestAdminResponse> getForAdmin(CreatorRequestStatus status, Pageable pageable) {
+        Pageable paged = Pageables.pageOnly(pageable);
         Page<CreatorRequest> page = (status == null)
-                ? creatorRequestRepository.findAllByOrderByIdDesc(pageable)
-                : creatorRequestRepository.findByStatus(status, pageable);
+                ? creatorRequestRepository.findAllByOrderByIdDesc(paged)
+                : creatorRequestRepository.findByStatusOrderByIdDesc(status, paged);
         return PageResponse.from(page.map(this::toAdmin));
     }
 

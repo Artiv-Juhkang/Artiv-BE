@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.artiv.domain.notification.dto.NotificationResponse;
 import com.juhkang.artiv.domain.notification.dto.UnreadSummaryResponse;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -48,9 +49,10 @@ public class NotificationService {
     }
 
     public PageResponse<NotificationResponse> getMine(Long userId, NotificationType type, Pageable pageable) {
+        Pageable paged = Pageables.pageOnly(pageable);
         return PageResponse.from((type == null
-                ? notificationRepository.findByRecipientIdOrderByIdDesc(userId, pageable)
-                : notificationRepository.findByRecipientIdAndTypeOrderByIdDesc(userId, type, pageable))
+                ? notificationRepository.findByRecipientIdOrderByIdDesc(userId, paged)
+                : notificationRepository.findByRecipientIdAndTypeOrderByIdDesc(userId, type, paged))
                 .map(NotificationResponse::of));
     }
 

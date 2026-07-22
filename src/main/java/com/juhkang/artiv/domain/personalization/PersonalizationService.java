@@ -14,13 +14,13 @@ import com.juhkang.artiv.domain.episode.Episode;
 import com.juhkang.artiv.domain.episode.EpisodeRepository;
 import com.juhkang.artiv.domain.episode.EpisodeStatus;
 import com.juhkang.artiv.domain.episode.access.EpisodeAccessEvaluator;
+import com.juhkang.artiv.domain.episode.access.EpisodeAccessGuard;
 import com.juhkang.artiv.domain.personalization.dto.BookmarkResponse;
 import com.juhkang.artiv.domain.personalization.dto.ReadHistoryResponse;
 import com.juhkang.artiv.domain.personalization.dto.SubscriptionResponse;
 import com.juhkang.artiv.global.dto.PageResponse;
 import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.domain.series.Series;
-import com.juhkang.artiv.domain.series.SeriesAccessChecker;
 import com.juhkang.artiv.domain.series.SeriesRepository;
 import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
@@ -39,10 +39,10 @@ public class PersonalizationService {
     private final ReadLogRepository readLogRepository;
     private final BookmarkRepository bookmarkRepository;
     private final SeriesRepository seriesRepository;
-    private final SeriesAccessChecker seriesAccessChecker;
     private final EpisodeRepository episodeRepository;
     private final UserRepository userRepository;
     private final EpisodeAccessEvaluator episodeAccessEvaluator;
+    private final EpisodeAccessGuard episodeAccessGuard;
 
     @Transactional
     public void subscribe(Long userId, Long seriesId) {
@@ -67,8 +67,10 @@ public class PersonalizationService {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
         Series series = episode.getSeries();
-        seriesAccessChecker.verifyInteractable(series, userId);
-        // 잠긴(기다리면무료 미전환) 회차는 실제 열람 불가 → 읽음 기록 안 함(UP·이어보기·서재 신호 정확성 + 미래 PAID seam).
+        // 비공개·19금·미발행 가드(미발행 회차는 존재를 숨겨 404 — F13).
+        episodeAccessGuard.verifyVisibleAndPublished(series, episode, userId);
+        // 잠긴(기다리면무료 미전환) 회차는 실제 열람 불가 → 읽음 기록만 조용히 스킵(뷰어는 애초에 잠긴 회차를
+        // 열지 않으므로 예외 대신 무해한 no-op. UP·이어보기·서재 신호 정확성 + 미래 PAID seam).
         boolean isPrivileged = series.isAuthoredBy(userId);
         if (!episodeAccessEvaluator.evaluate(series, episode, userId, isPrivileged, Instant.now()).accessible()) {
             return;
@@ -84,7 +86,7 @@ public class PersonalizationService {
     public void bookmark(Long userId, Long seriesId, int episodeNo) {
         Episode episode = episodeRepository.findBySeriesIdAndEpisodeNo(seriesId, episodeNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
-        seriesAccessChecker.verifyInteractable(episode.getSeries(), userId);
+        episodeAccessGuard.verifyInteractable(episode.getSeries(), episode, userId); // 미발행·잠긴 회차 북마크 차단(F13)
         if (bookmarkRepository.existsByUserIdAndEpisodeId(userId, episode.getId())) {
             return; // 멱등: 이미 북마크면 그대로
         }

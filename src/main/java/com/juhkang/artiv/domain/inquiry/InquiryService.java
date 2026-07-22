@@ -19,6 +19,7 @@ import com.juhkang.artiv.domain.notification.NotificationType;
 import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 import com.juhkang.artiv.global.storage.ImageStorageService;
@@ -59,7 +60,8 @@ public class InquiryService {
     }
 
     public PageResponse<InquiryResponse> getMine(Long userId, Pageable pageable) {
-        return PageResponse.from(inquiryRepository.findByUserId(userId, pageable).map(InquiryResponse::of));
+        return PageResponse.from(inquiryRepository.findByUserIdOrderByIdDesc(userId, Pageables.pageOnly(pageable))
+                .map(InquiryResponse::of));
     }
 
     public InquiryDetailResponse getMineDetail(Long userId, Long inquiryId) {
@@ -82,7 +84,8 @@ public class InquiryService {
     // ---- 관리자 ----
 
     public PageResponse<InquiryAdminResponse> getForAdmin(InquiryType type, InquiryStatus status, Pageable pageable) {
-        return PageResponse.from(inquiryRepository.findForAdmin(type, status, pageable).map(InquiryAdminResponse::of));
+        return PageResponse.from(inquiryRepository.findForAdmin(type, status, Pageables.pageOnly(pageable))
+                .map(InquiryAdminResponse::of));
     }
 
     public InquiryAdminDetailResponse getAdminDetail(Long inquiryId) {

@@ -14,6 +14,7 @@ import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.domain.user.UserRepository;
 import com.juhkang.artiv.domain.user.dto.UserResponse;
 import com.juhkang.artiv.global.dto.PageResponse;
+import com.juhkang.artiv.global.dto.Pageables;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -29,12 +30,12 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> getUsers(String keyword, Role role, Pageable pageable) {
-        return PageResponse.from(userRepository.search(keyword, role, pageable).map(UserResponse::of));
+        return PageResponse.from(userRepository.search(keyword, role, Pageables.pageOnly(pageable)).map(UserResponse::of));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<SeriesSummaryResponse> getAllSeries(Boolean visible, Pageable pageable) {
-        return PageResponse.from(seriesRepository.findForAdmin(visible, pageable).map(SeriesSummaryResponse::of));
+        return PageResponse.from(seriesRepository.findForAdmin(visible, Pageables.pageOnly(pageable)).map(SeriesSummaryResponse::of));
     }
 
     public UserResponse changeUserRole(Long userId, Role role) {

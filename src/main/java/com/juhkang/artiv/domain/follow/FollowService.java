@@ -2,6 +2,7 @@ package com.juhkang.artiv.domain.follow;
 
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,14 @@ public class FollowService {
         if (followRepository.existsByFollowerIdAndFollowingId(followerId, targetId)) {
             return; // 멱등 — 재팔로우는 알림 없음
         }
-        followRepository.save(Follow.create(followerId, targetId));
+        try {
+            followRepository.save(Follow.create(followerId, targetId));
+        } catch (DataIntegrityViolationException race) {
+            // 동시 팔로우 클릭 경합(uq_follow_pair 유니크 충돌). Postgres가 트랜잭션 전체를 abort시켜
+            // 같은 트랜잭션에서 재조회가 불가하므로, 클라이언트가 재시도하면 위 exists 선체크로 멱등
+            // 성공하도록 명확한 에러(400)로 위임한다(ChatService.createDirect와 동일 패턴 — F22).
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
         notificationService.fanOut(List.of(targetId), NotificationType.FOLLOWED, NotificationTargetType.USER,
                 followerId, followerId, "새 팔로워", "회원님을 팔로우하기 시작했어요.",
                 rid -> "FOLLOW:" + followerId);

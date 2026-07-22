@@ -12,7 +12,7 @@ public interface CreatorRequestRepository extends JpaRepository<CreatorRequest, 
 
     Optional<CreatorRequest> findTopByUserIdOrderByIdDesc(Long userId);
 
-    Page<CreatorRequest> findByStatus(CreatorRequestStatus status, Pageable pageable);
+    Page<CreatorRequest> findByStatusOrderByIdDesc(CreatorRequestStatus status, Pageable pageable);
 
     Page<CreatorRequest> findAllByOrderByIdDesc(Pageable pageable);
 }
