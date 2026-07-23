@@ -78,6 +78,8 @@ class LibraryActivityFlowTest {
         User me = userRepository.findById(meId).orElseThrow();
         User author = userRepository.findById(user("서재작가", Role.CREATOR)).orElseThrow();
         Series series = seriesRepository.save(Series.create("연재물", "설명", author, AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY)));
+        series.changeCover("/files/cover-r.png");
+        seriesRepository.save(series);
         Episode ep1 = episodeRepository.save(Episode.create(series, 1, "1화", EpisodeStatus.PUBLISHED, Instant.now()));
         Episode ep2 = episodeRepository.save(Episode.create(series, 2, "2화", EpisodeStatus.PUBLISHED, Instant.now()));
         readLogRepository.save(ReadLog.create(me, ep1));
@@ -88,6 +90,7 @@ class LibraryActivityFlowTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].seriesId").value(series.getId()))
                 .andExpect(jsonPath("$.content[0].seriesTitle").value("연재물"))
+                .andExpect(jsonPath("$.content[0].coverUrl").value("/files/cover-r.png"))
                 .andExpect(jsonPath("$.content[0].lastReadEpisodeNo").value(2));
     }
 

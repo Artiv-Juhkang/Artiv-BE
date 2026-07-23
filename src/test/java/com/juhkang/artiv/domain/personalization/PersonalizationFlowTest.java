@@ -68,6 +68,8 @@ class PersonalizationFlowTest {
 
         series = seriesRepository.save(Series.create(
                 "작품", "", creator, AgeRating.ALL, SeriesStatus.ONGOING, Set.of(DayOfWeek.MONDAY)));
+        series.changeCover("/files/cover-p.png");
+        seriesRepository.save(series);
         episodeRepository.save(Episode.create(series, 1, "1화", EpisodeStatus.PUBLISHED, Instant.now()));
     }
 
@@ -89,7 +91,8 @@ class PersonalizationFlowTest {
                 .andExpect(jsonPath("$.last").value(true))
                 .andExpect(jsonPath("$.content[0].latestEpisodeNo").value(1))
                 .andExpect(jsonPath("$.content[0].lastReadEpisodeNo").value(0))
-                .andExpect(jsonPath("$.content[0].up").value(true));
+                .andExpect(jsonPath("$.content[0].up").value(true))
+                .andExpect(jsonPath("$.content[0].coverUrl").value("/files/cover-p.png"));
 
         // 1화 읽음 → UP 사라짐
         mockMvc.perform(post("/api/series/" + sid + "/episodes/1/read")

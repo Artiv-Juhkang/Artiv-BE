@@ -127,7 +127,7 @@ public class PersonalizationService {
             int latestNo = latestNoBySeries.getOrDefault(series.getId(), 0);
             int lastReadNo = lastReadNoBySeries.getOrDefault(series.getId(), 0);
             boolean up = latestNo > lastReadNo; // 최신 발행 회차 > 마지막 읽은 회차 = 새 회차 있음(UP)
-            return new SubscriptionResponse(series.getId(), series.getTitle(), latestNo, lastReadNo, up);
+            return new SubscriptionResponse(series.getId(), series.getTitle(), series.getCoverUrl(), latestNo, lastReadNo, up);
         }));
     }
 
@@ -135,9 +135,16 @@ public class PersonalizationService {
     public PageResponse<ReadHistoryResponse> getReadHistory(Long userId, Pageable pageable) {
         Page<ReadSeriesRow> page = readLogRepository.findReadSeries(userId, Pageables.pageOnly(pageable));
         List<Long> seriesIds = page.getContent().stream().map(ReadSeriesRow::getSeriesId).toList();
-        Map<Long, String> titleBySeries = seriesRepository.findAllById(seriesIds).stream()
-                .collect(Collectors.toMap(Series::getId, Series::getTitle));
-        return PageResponse.from(page.map(row -> new ReadHistoryResponse(
-                row.getSeriesId(), titleBySeries.get(row.getSeriesId()), row.getMaxNo(), row.getLastReadAt())));
+        Map<Long, Series> seriesById = seriesRepository.findAllById(seriesIds).stream()
+                .collect(Collectors.toMap(Series::getId, s -> s));
+        return PageResponse.from(page.map(row -> {
+            Series series = seriesById.get(row.getSeriesId());
+            return new ReadHistoryResponse(
+                    row.getSeriesId(),
+                    series != null ? series.getTitle() : null,
+                    series != null ? series.getCoverUrl() : null,
+                    row.getMaxNo(),
+                    row.getLastReadAt());
+        }));
     }
 }

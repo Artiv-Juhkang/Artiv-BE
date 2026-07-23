@@ -4915,6 +4915,9 @@
           "title" : {
             "type" : "string"
           },
+          "coverUrl" : {
+            "type" : "string"
+          },
           "latestEpisodeNo" : {
             "type" : "integer",
             "format" : "int32"
@@ -4966,6 +4969,9 @@
             "format" : "int64"
           },
           "seriesTitle" : {
+            "type" : "string"
+          },
+          "coverUrl" : {
             "type" : "string"
           },
           "lastReadEpisodeNo" : {
