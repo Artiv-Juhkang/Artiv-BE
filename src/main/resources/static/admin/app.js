@@ -109,7 +109,7 @@
         <form class="login__card panel" id="loginForm" novalidate>
           <button type="button" class="login__theme" id="loginTheme" aria-label="테마 전환"></button>
           <div class="login__brand">
-            <span class="login__logo">App<b>Toon</b></span>
+            <span class="login__logo">Art<b>iv</b></span>
             <span class="stamp">STUDIO</span>
           </div>
           <p class="login__sub">작가·관리자 콘솔에 로그인하세요</p>
@@ -183,7 +183,7 @@
     app.innerHTML = `
       <div class="shell">
         <aside class="side">
-          <div class="side__logo">App<b>Toon</b></div>
+          <div class="side__logo">Art<b>iv</b></div>
           <div class="side__brandsub">Studio · ${state.user.role === 'ADMIN' ? '관리자' : '작업실'}</div>
           <button class="side__who" id="account" aria-haspopup="dialog" title="설정 열기">
             <strong>${esc(state.user.nickname)}</strong>

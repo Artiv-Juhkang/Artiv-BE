@@ -293,6 +293,9 @@ def main():
         "danu": ensure_user("seed-danu@artiv.test", "단우", PW, True),
     }
     reader = ensure_user("seed-reader@artiv.test", "구름", PW, False)
+    # 운영자(ADMIN) — 관리자 콘솔(/admin)·모더레이션 검증용. 가입 후 role만 승격.
+    ensure_user("admin@artiv.test", "운영자", PW, False)
+    psql("UPDATE users SET role='ADMIN' WHERE email='admin@artiv.test';")
 
     created = []  # (series_id, content_type, title)
     notify_targets = []  # 구독→새회차 알림용 (series_id, author_token)
