@@ -174,6 +174,21 @@ def subscribe(token, series_id):
                      "-H", f"Authorization: Bearer {token}"])
     return code
 
+def post_form(path, token, fields):
+    """multipart/form-data POST — 게시글처럼 @RequestParam 기반인 엔드포인트용."""
+    args = ["-X", "POST", f"{API}{path}", "-H", f"Authorization: Bearer {token}"]
+    for key, value in fields.items():
+        args += ["-F", f"{key}={value}"]
+    return _curl(args)
+
+
+def psql_value(sql):
+    """단일 스칼라 조회(-t -A로 헤더·정렬 제거). 없으면 None."""
+    r = subprocess.run([*DB, "-t", "-A"], input=sql, capture_output=True, text=True)
+    out = r.stdout.strip()
+    return out.splitlines()[0] if out else None
+
+
 def psql(sql):
     r = subprocess.run(DB, input=sql, capture_output=True, text=True)
     if r.returncode != 0:
@@ -273,6 +288,75 @@ def create_series(token, title, content_type, genre, age, status, adult, days, t
     return json.loads(body)["id"]
 
 
+POSTS = [  # (작성자키, 카테고리, 제목, 내용)
+    ("raon", "자유", "다들 어떤 매체로 보세요?", "저는 출퇴근엔 오디오, 주말엔 웹툰 몰아봅니다. 여러분은요?"),
+    ("miru", "자유", "오늘 새 회차 올렸어요", "밤새 그렸는데 컷 나누기가 제일 어렵네요. 봐주시면 감사합니다."),
+    ("danu", "추천", "추리물 좋아하면 볼 만한 작품", "반전이 촘촘한 편이라 초반 3화만 넘기면 훅 빨려듭니다."),
+    ("reader", "질문", "소설 뷰어 글자 크기 조절 되나요?", "밤에 보면 눈이 좀 피로해서요. 설정 어디 있는지 못 찾겠어요."),
+    ("reader", "자유", "서재에 쌓인 작품이 벌써 스무 편", "관심만 눌러두고 안 본 게 절반이라 반성 중입니다."),
+    ("raon", "질문", "연재 요일 정할 때 기준이 뭔가요?", "독자 유입이 많은 요일이 따로 있는지 궁금합니다."),
+    ("miru", "추천", "그림체가 예쁜 일러스트 모음", "색감 참고하려고 저장해둔 작품들 공유해요."),
+    ("danu", "자유", "작업할 때 듣는 음악", "가사 없는 걸 주로 듣는데 다들 뭐 들으시나요?"),
+]
+
+
+def seed_community_and_chat(tokens, reader):
+    """
+    커뮤니티 게시글 + 채팅(DM 1쌍·단체방 1개)을 시드한다.
+
+    RESET_SQL은 콘텐츠 테이블만 비우고 커뮤니티/채팅은 보존한다 — 그래서 --reset 재실행에도
+    글이 쌓이지 않도록 멱등 가드를 둔다(트런케이트 범위를 넓히면 기존 계약이 바뀌므로 그 대신 스킵).
+    가드 기준은 '시드가 넣은 글'의 존재다 — 단순 posts 카운트로 잡으면 손으로 쓴 글이 하나만
+    있어도 시드가 영영 돌지 않는다.
+    """
+    marker = POSTS[0][2]
+    existing = psql_value(f"SELECT count(*) FROM posts WHERE title = '{marker}';")
+    if existing and int(existing) > 0:
+        print("• 커뮤니티/채팅 시드 건너뜀(이미 시드됨)")
+        return
+
+    print("• 커뮤니티 카테고리·게시글 …")
+    for name in ("자유", "질문", "추천"):
+        post_json("/api/post-categories", {"name": name}, tokens["raon"])  # 중복이면 400 — 무시
+    author_token = {**tokens, "reader": reader}
+    for key, category, title, content in POSTS:
+        code, _ = post_form("/api/posts", author_token[key],
+                            {"category": category, "title": title, "content": content})
+        if code not in (200, 201):
+            print(f"  게시글 실패({code}): {title}")
+
+    print("• 채팅 DM·단체방(친구=상호 팔로우 선행) …")
+    ids = {key: psql_value(f"SELECT id FROM users WHERE email = '{email}';")
+           for key, email in (("raon", "creator@artiv.test"), ("miru", "seed-miru@artiv.test"),
+                              ("danu", "seed-danu@artiv.test"), ("reader", "seed-reader@artiv.test"))}
+    if any(v is None for v in ids.values()):
+        print("  사용자 id 조회 실패 — 채팅 시드 건너뜀")
+        return
+    # 단체방은 멤버 전원이 생성자와 상호 팔로우여야 하고, DM도 상호 팔로우면 즉시 ACCEPTED다.
+    for a, b in (("raon", "miru"), ("raon", "danu"), ("raon", "reader")):
+        post_json(f"/api/users/{ids[b]}/follow", {}, author_token[a])
+        post_json(f"/api/users/{ids[a]}/follow", {}, author_token[b])
+
+    code, body = post_json("/api/conversations",
+                           {"type": "DIRECT", "targetUserId": int(ids["miru"])}, tokens["raon"])
+    if code in (200, 201):
+        conv = json.loads(body)["id"]
+        post_json(f"/api/conversations/{conv}/messages", {"content": "미루님 새 회차 잘 봤어요!"}, tokens["raon"])
+        post_json(f"/api/conversations/{conv}/messages", {"content": "앗 감사합니다 :) 다음 화도 곧 올려요"}, tokens["miru"])
+    else:
+        print(f"  DM 생성 실패({code})")
+
+    code, body = post_json("/api/conversations",
+                           {"type": "GROUP", "title": "연재 작가 모임",
+                            "memberIds": [int(ids["miru"]), int(ids["danu"])]}, tokens["raon"])
+    if code in (200, 201):
+        conv = json.loads(body)["id"]
+        post_json(f"/api/conversations/{conv}/messages", {"content": "이번 주 마감 다들 무사하신가요"}, tokens["raon"])
+        post_json(f"/api/conversations/{conv}/messages", {"content": "저는 오늘 밤 새워야 할 것 같아요"}, tokens["danu"])
+    else:
+        print(f"  단체방 생성 실패({code})")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reset", action="store_true", help="콘텐츠 테이블 truncate 후 재시드")
@@ -354,6 +438,8 @@ def main():
          "WHERE cover_url IS NULL "
          "AND content_type IN ('WEBTOON','ILLUSTRATION','DESIGN','PHOTO','DRAWING') "
          "AND EXISTS (SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.episode_no = 1);")
+
+    seed_community_and_chat(tokens, reader)
 
     print("• publish_at 스태거 백필('최근 업데이트' 정렬이 의미를 갖도록) …")
     # 각 시리즈의 '최신 회차'를 앵커로 과거 방향으로만 스태거한다(미래 발행 금지):
