@@ -325,6 +325,22 @@ class ChatFlowTest {
     }
 
     @Test
+    void 차단한_상대가_섞이면_단체방_생성이_거부된다() throws Exception {
+        follow(aToken, bId); follow(bToken, aId);
+        follow(aToken, cId); follow(cToken, aId);
+        // C가 A를 차단 — 차단은 기존 팔로우를 해제하지 않으므로 '상호 팔로우'는 그대로 성립한다.
+        // 차단 검사가 없으면 A가 C를 단체방에 끌어들여 DM 차단(D7=a)을 우회할 수 있다.
+        mockMvc.perform(post("/api/users/" + aId + "/block").header("Authorization", "Bearer " + cToken))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/conversations")
+                        .header("Authorization", "Bearer " + aToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GROUP\",\"title\":\"모임\",\"memberIds\":[" + bId + "," + cId + "]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void 단체방_제목이_비었거나_친구가_2명_미만이면_거부된다() throws Exception {
         follow(aToken, bId); follow(bToken, aId);
         follow(aToken, cId); follow(cToken, aId);

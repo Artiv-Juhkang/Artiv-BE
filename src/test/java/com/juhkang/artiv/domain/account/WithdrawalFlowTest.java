@@ -100,6 +100,25 @@ class WithdrawalFlowTest {
     }
 
     @Test
+    void 탈퇴한_계정은_센티널_이메일과_옛_비밀번호로도_로그인할_수_없다() throws Exception {
+        User user = userRepository.save(
+                User.create("sentinel@test.com", passwordEncoder.encode("password123"), "센티널", Role.READER, null));
+        String accessToken = objectMapper.readTree(login("sentinel@test.com", "password123")).get("accessToken").asString();
+
+        mockMvc.perform(delete("/api/users/me").header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"password123\"}"))
+                .andExpect(status().isNoContent());
+
+        // 센티널 이메일 규칙(withdrawn+{id}@artiv.invalid)은 예측 가능하고 비밀번호도 남아 있다.
+        // login이 deletedAt을 검사하지 않으면 탈퇴 계정이 그대로 되살아난다(refresh는 이미 검사 중).
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"withdrawn+" + user.getId() + "@artiv.invalid\","
+                                + "\"password\":\"password123\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void 작가가_탈퇴하면_작품이_전부_비공개로_전환된다() throws Exception {
         User creator = userRepository.save(
                 User.create("creator-bye@test.com", passwordEncoder.encode("password123"), "떠나는작가", Role.CREATOR, null));

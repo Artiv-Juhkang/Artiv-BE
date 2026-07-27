@@ -4048,6 +4048,14 @@
             "type" : "string",
             "enum" : [ "ONGOING", "COMPLETED", "HIATUS" ]
           },
+          "contentType" : {
+            "type" : "string",
+            "enum" : [ "WEBTOON", "ILLUSTRATION", "DESIGN", "PHOTO", "DRAWING", "NOVEL", "AUDIO" ]
+          },
+          "genre" : {
+            "type" : "string",
+            "enum" : [ "ROMANCE", "FANTASY", "ACTION", "DRAMA", "DAILY", "COMEDY", "THRILLER", "SPORTS", "HORROR", "ETC" ]
+          },
           "publishDays" : {
             "type" : "array",
             "items" : {

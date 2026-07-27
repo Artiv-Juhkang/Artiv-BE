@@ -95,7 +95,10 @@ class AdminFlowTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ageRating\":\"AGE_19\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ageRating").value("AGE_19"));
+                .andExpect(jsonPath("$.ageRating").value("AGE_19"))
+                // 관리 응답도 매체·장르를 담아야 admin이 다매체 작품을 구분할 수 있다(목록 요약과 정합).
+                .andExpect(jsonPath("$.contentType").value("WEBTOON"))
+                .andExpect(jsonPath("$.genre").exists());
     }
 
     @Test

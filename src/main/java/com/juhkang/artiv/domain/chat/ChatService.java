@@ -123,6 +123,14 @@ public class ChatService {
         if (!allFriends) {
             throw new BusinessException(ErrorCode.INVALID_INPUT); // 친구 아닌 사용자 포함
         }
+        boolean blocked = distinctMembers.stream().anyMatch(memberId ->
+                blockRepository.existsByBlockerIdAndBlockedId(userId, memberId)
+                        || blockRepository.existsByBlockerIdAndBlockedId(memberId, userId));
+        if (blocked) {
+            // 차단은 기존 팔로우를 해제하지 않아 '차단했지만 상호 팔로우'가 남는다 — 이 검사가 없으면
+            // 단체방이 DM 차단(D7=a)의 우회로가 된다. createDirect와 동일한 FORBIDDEN 계약.
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
 
         Conversation conversation = conversationRepository.save(Conversation.group(userId, title.strip(), anonymous));
         // 익명 여부와 무관하게 1부터 순번 배정(생성자=1) — anonymous일 때만 응답에서 실제로 쓰인다.

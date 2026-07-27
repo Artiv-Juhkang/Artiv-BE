@@ -69,6 +69,11 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
+        if (user.getDeletedAt() != null) {
+            // 탈퇴 계정은 센티널 이메일(withdrawn+{id}@artiv.invalid)이 예측 가능하고 비밀번호도 남아 있어
+            // 이 검사가 없으면 그대로 되살아난다. refresh(아래)와 동일한 거부 계약.
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
         return issueTokens(user);
     }
 

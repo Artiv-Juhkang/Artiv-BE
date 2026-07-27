@@ -5,3 +5,8 @@ spring:
     password: ${DB_PASSWORD}
   jpa:
     show-sql: false
+
+# 운영은 기본값을 두지 않는다 — 미지정이면 기동 단계에서 실패한다(ProdSafetyGuard가 값까지 검사).
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
