@@ -171,7 +171,8 @@
       return [['admin-series', '작품 관리'], ['admin-users', '사용자 관리'], ['admin-inquiries', '문의 관리'],
         ['admin-creator-requests', '작가 신청'], ['admin-reports', '신고 관리'], ['admin-community', '커뮤니티 관리']];
     }
-    return [['dashboard', '내 작품'], ['create', '작품 등록'], ['followers', '팔로워'], ['inquiries', '문의']];
+    return [['dashboard', '내 작품'], ['insights', '작품 진단'], ['create', '작품 등록'],
+      ['followers', '팔로워'], ['inquiries', '문의']];
   }
 
   function renderShell(inner) {
@@ -401,6 +402,7 @@
     renderShell(loading);
     const v = state.view;
     if (v === 'dashboard') return viewMySeries();
+    if (v === 'insights') return viewInsights();
     if (v === 'create') return viewCreate();
     if (v === 'episodes') return viewEpisodes();
     if (v === 'admin-series') return viewAdminSeries();
@@ -449,6 +451,7 @@
       <div class="card__actions">
         <button class="btn btn--accent btn--sm" data-act="upload">+ 회차 업로드</button>
         <button class="btn btn--sm" data-act="episodes">회차 보기</button>
+        <button class="btn btn--sm" data-act="insights">진단</button>
       </div>
     </article>`;
   }
@@ -459,6 +462,97 @@
     const act = e.target.closest('button[data-act]')?.dataset.act;
     if (act === 'upload') openUpload(id, title);
     else if (act === 'episodes') { pickedSeries = { id, title }; state.view = 'episodes'; route(); }
+    else if (act === 'insights') { pickedSeries = { id, title }; state.view = 'insights'; route(); }
+  }
+
+  // ====================================================================
+  // 작가 — 작품 진단 (온톨로지)
+  // ====================================================================
+  const SEG_TONE = { NEW: 'mint', LOYAL: 'lav', AT_RISK: 'rose', LAPSED: 'muted' };
+
+  async function viewInsights() {
+    if (!pickedSeries) {
+      try {
+        const list = await api('GET', '/api/series/mine');
+        if (!list.length) return setMain(emptyBox('진단할 작품이 없어요', '먼저 작품을 등록하세요.'));
+        setMain(`
+          <div class="page-head"><div><span class="eyebrow">Ontology</span><h1>작품 진단</h1>
+            <p>진단할 작품을 고르세요 — 회차가 여러 개인 작품일수록 잔존 곡선이 의미를 가집니다</p></div></div>
+          <div class="grid">${list.map(seriesCard).join('')}</div>`);
+        $('#main').addEventListener('click', onMySeriesClick);
+      } catch (e) { setMain(errBox(e)); }
+      return;
+    }
+
+    try {
+      const d = await api('GET', `/api/ontology/works/${pickedSeries.id}/insights`);
+      const pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
+      const maxR = Math.max(1, ...d.retention.map((r) => r.uniqueReaders));
+
+      const bars = d.retention.length ? d.retention.map((r) => `
+        <div class="ret ${r.cliff ? 'ret--cliff' : ''}">
+          <span class="ret__no">${r.episodeNo}화</span>
+          <span class="ret__bar"><i style="width:${Math.max(2, (100 * r.uniqueReaders) / maxR)}%"></i></span>
+          <span class="ret__pct mono">${r.retentionPct}%</span>
+          <span class="ret__n mono">${r.uniqueReaders}명</span>
+          <span class="ret__flag">${r.cliff ? '<span class="tag tag--adult">이탈 절벽</span>' : ''}</span>
+        </div>`).join('')
+        : emptyBox('아직 열람 데이터가 없어요', '독자가 회차를 읽으면 잔존 곡선이 그려집니다.');
+
+      const entries = d.entryPoints.length ? d.entryPoints.map((e) => `
+        <div class="ret">
+          <span class="ret__no">${esc(e.label)}</span>
+          <span class="ret__bar"><i style="width:${Math.max(2, e.share * 100)}%"></i></span>
+          <span class="ret__pct mono">${Math.round(e.share * 100)}%</span>
+          <span class="ret__n mono">${e.sessions}건</span><span class="ret__flag"></span>
+        </div>`).join('')
+        : '<p class="muted">최근 30일 유입 데이터가 없습니다.</p>';
+
+      const segs = d.segments.map((s2) => `
+        <span class="tag seg seg--${SEG_TONE[s2.segment] || ''}" title="${esc(s2.rule)}">
+          ${esc(s2.label)} · ${s2.disclosed ? `${s2.size}명` : '5명 미만 비공개'}
+        </span>`).join(' ');
+
+      const acts = d.applicableActions.map((a) => `<span class="tag">${a}</span>`).join(' ');
+
+      setMain(`
+        <div class="page-head">
+          <div><span class="eyebrow">Ontology · Work</span><h1>${esc(d.title)}</h1>
+            <p>${esc(d.medium)} · 요약/유입/세그먼트는 최근 ${d.window.days}일, 잔존은 생애 전체</p></div>
+          <button class="btn btn--sm" data-go="dashboard">← 작품 목록</button>
+        </div>
+
+        <div class="stats-row">
+          ${stat(d.summary.sessions, '열람 세션')}
+          ${stat(d.summary.uniqueReaders, '고유 독자')}
+          ${stat(pct(d.summary.completionRate), '완독률')}
+        </div>
+        <p class="muted">원자료 ${d.summary.sampleSize}건 기준 · 10건 미만이면 비율을 표시하지 않습니다.</p>
+
+        <section class="panel ins">
+          <h3>회차별 잔존</h3>
+          ${bars}
+          ${d.cliff ? `<p class="muted">→ <b>${d.cliff.episodeNo}화</b>에서 ${d.cliff.dropPct}%p 급락했습니다. 그 회차의 도입부·썸네일·제목을 점검해 보세요.</p>` : '<p class="muted">뚜렷한 이탈 절벽이 감지되지 않았습니다.</p>'}
+        </section>
+
+        <section class="panel ins">
+          <h3>유입 경로 <span class="muted">최근 ${d.window.days}일</span></h3>
+          ${entries}
+        </section>
+
+        <section class="panel ins">
+          <h3>독자 세그먼트</h3>
+          <div class="segrow">${segs}</div>
+          <p class="muted">5명 미만 세그먼트는 개인 식별 위험이 있어 크기를 공개하지 않습니다(k-익명성).</p>
+        </section>
+
+        <section class="panel ins">
+          <h3>적용 가능 액션</h3>
+          <div class="segrow">${acts}</div>
+          <p class="muted">액션 실행 UI는 Phase B에서 붙습니다.</p>
+        </section>`);
+      bindGo();
+    } catch (e) { setMain(errBox(e)); }
   }
 
   // ====================================================================

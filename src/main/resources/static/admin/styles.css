@@ -291,3 +291,24 @@ button { font-family:inherit; }
   .form-grid { grid-template-columns:1fr; }
 }
 @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
+
+
+/* ── 온톨로지 진단 — 잔존/유입 막대 (차트 라이브러리 없이 div만) ───────── */
+.ins { margin-top: 16px; }
+.ins h3 { margin: 0 0 10px; font-size: 15px; }
+.ins h3 .muted { font-weight: 400; font-size: 12px; margin-left: 6px; }
+.ret { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 13px; }
+.ret__no { width: 84px; color: var(--muted); flex: none; }
+.ret__bar { flex: 1; min-width: 60px; height: 10px; border-radius: 6px;
+            background: var(--tagbg); border: 1px solid var(--line); overflow: hidden; }
+.ret__bar > i { display: block; height: 100%; background: var(--amber); }
+.ret__pct { width: 52px; text-align: right; flex: none; }
+.ret__n { width: 56px; text-align: right; color: var(--muted); flex: none; }
+.ret__flag { width: 78px; flex: none; }
+.ret--cliff .ret__bar > i { background: var(--rose); }
+.ret--cliff .ret__no { font-weight: 700; color: var(--rose); }
+.segrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg--mint { color: var(--mint); }
+.seg--lav { color: var(--lav); }
+.seg--rose { color: var(--rose); }
+.seg--muted { color: var(--muted); }
