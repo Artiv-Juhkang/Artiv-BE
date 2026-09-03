@@ -2,6 +2,7 @@ package com.juhkang.artiv.domain.ontology;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.juhkang.artiv.domain.episode.Episode;
 import com.juhkang.artiv.domain.episode.EpisodeRepository;
+import com.juhkang.artiv.domain.ontology.dto.OntologySchemaResponse;
 import com.juhkang.artiv.domain.ontology.dto.ReadingEventRequest;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
@@ -28,6 +30,11 @@ public class OntologyController {
 
     private final EpisodeRepository episodeRepository;
     private final ReadingEventRepository readingEventRepository;
+
+    @GetMapping("/api/ontology/schema")
+    public OntologySchemaResponse schema() {
+        return OntologySchemaResponse.of();
+    }
 
     @PostMapping("/api/reading-events")
     @ResponseStatus(HttpStatus.ACCEPTED)
