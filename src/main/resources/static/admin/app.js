@@ -203,7 +203,10 @@
       </div>`;
     $('.nav').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-view]');
-      if (b) { state.view = b.dataset.view; route(); }
+      if (!b) return;
+      // 나브로 진입할 때는 직전에 고른 작품을 들고 가지 않는다(진단이 엉뚱한 작품을 열던 문제).
+      if (b.dataset.view !== state.view) pickedSeries = null;
+      state.view = b.dataset.view; route();
     });
     $('#account').addEventListener('click', openSettings);
     $('#bell').addEventListener('click', openNotifications);
@@ -518,7 +521,7 @@
       setMain(`
         <div class="page-head">
           <div><span class="eyebrow">Ontology · Work</span><h1>${esc(d.title)}</h1>
-            <p>${esc(d.medium)} · 요약/유입/세그먼트는 최근 ${d.window.days}일, 잔존은 생애 전체</p></div>
+            <p>${esc(d.medium)} · 요약·유입은 최근 ${d.window.days}일 / 잔존·세그먼트는 생애 전체</p></div>
           <button class="btn btn--sm" data-go="dashboard">← 작품 목록</button>
         </div>
 
@@ -541,9 +544,10 @@
         </section>
 
         <section class="panel ins">
-          <h3>독자 세그먼트</h3>
+          <h3>독자 세그먼트 <span class="muted">전체 기간</span></h3>
           <div class="segrow">${segs}</div>
-          <p class="muted">5명 미만 세그먼트는 개인 식별 위험이 있어 크기를 공개하지 않습니다(k-익명성).</p>
+          <p class="muted">5명 미만 세그먼트는 개인 식별 위험이 있어 크기를 공개하지 않습니다(k-익명성).
+            세그먼트는 전체 기간 기준이라 위 요약(최근 ${d.window.days}일)의 고유 독자 수와 합계가 다릅니다.</p>
         </section>
 
         <section class="panel ins">

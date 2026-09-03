@@ -63,12 +63,10 @@ def ensure_readers(n):
     """합성 독자 user 행을 확보하고 id 목록을 돌려준다. 비밀번호 해시는 기존 유저에서 복사."""
     existing = rows("select id from users where email like 'sim%@artiv.test' order by id;")
     if len(existing) < n:
-        sample = rows("select password from users limit 1;")
-        if not sample:
-            print("[중단] users가 비어 있습니다. scripts/seed-demo.py --reset 먼저 실행하세요.",
-                  file=sys.stderr)
-            sys.exit(1)
-        pw = sample[0][0].replace("'", "''")
+        # 로그인 불가 해시. 기존 유저의 해시를 복사하면 그 비밀번호로 실제 로그인되는 계정이
+        # 80개 생긴다 — 개발 전용이라도 만들 이유가 없다. bcrypt가 아닌 문자열이라 matches()가
+        # 항상 false다(BCryptPasswordEncoder는 형식 불일치 시 경고 후 false).
+        pw = "!synthetic-no-login"
         values = [f"('sim{i}@artiv.test', '{pw}', '시뮬독자{i:03d}', 'READER', "
                   f"DATE '1995-03-15', now(), now())" for i in range(len(existing), n)]
         psql("insert into users (email, password, nickname, role, birth_date, created_at, updated_at) "

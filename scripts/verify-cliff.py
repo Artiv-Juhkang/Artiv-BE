@@ -24,7 +24,10 @@ TRUTH = os.path.join(HERE, "seed-truth.json")
 DB = ["docker", "exec", "-i", "artiv-db", "psql", "-U", "artiv", "-d", "artiv"]
 # 시드 계정마다 비밀번호가 다르다(docs/local-accounts.md). 순서대로 시도한다.
 PASSWORDS = ["seedpass123", "artiv-pass-1", "password123"]
+# 합성 데이터에 난수가 섞여 있어 100%를 요구하지 않는다. 두 값 모두 경험적 기준이며,
+# 회귀 감지용 하한이지 통계적 유의성을 주장하지 않는다.
 PASS_THRESHOLD = 60.0
+MIN_COVERAGE = 80.0
 
 
 def req(method, path, body=None, token=None):
@@ -108,15 +111,33 @@ def main():
         print(f"{title:<26}{expected:>5}{(found if found else '-'):>5}   {mark}")
 
     total = hits + miss + undetected
+    planned = len(truth["works"])
     print("-" * 52)
     if total == 0:
         print("대조 가능한 작품이 없습니다.")
         sys.exit(1)
     rate = 100.0 * hits / total
-    print(f"탐지 정확도 {hits}/{total} ({rate:.0f}%)  ·  불일치 {miss} · 미탐지 {undetected} · 건너뜀 {skipped}")
-    # 합성 데이터에 난수가 섞여 있어 100%를 요구하지 않는다.
-    print("합격" if rate >= PASS_THRESHOLD else f"불합격 (기준 {PASS_THRESHOLD:.0f}%)")
-    sys.exit(0 if rate >= PASS_THRESHOLD else 2)
+    print(f"탐지 정확도 {hits}/{total} ({rate:.0f}%)  ·  불일치 {miss} · 미탐지 {undetected}")
+
+    # 건너뜀을 분모에서 빼면 대부분 실패해도 합격이 보고된다. 명시적으로 드러내고,
+    # 커버리지가 낮으면 정확도와 무관하게 실패시킨다(조용한 축소 금지).
+    coverage = 100.0 * total / planned
+    print(f"커버리지 {total}/{planned} ({coverage:.0f}%)  ·  건너뜀 {skipped}")
+    eps = sorted({w["episodes"] for w in truth["works"]})
+    print(f"벤치마크 회차 범위 {min(eps)}~{max(eps)}화 — 15화 이상 장편은 이 시드에 없다.")
+    print("  (장편 후반 절벽은 InsightsRegressionTest.기하감소_곡선의_후반_절벽을_찾아낸다 가 덮는다)")
+
+    ok = rate >= PASS_THRESHOLD and coverage >= MIN_COVERAGE
+    if not ok:
+        why = []
+        if rate < PASS_THRESHOLD:
+            why.append(f"정확도 {rate:.0f}% < {PASS_THRESHOLD:.0f}%")
+        if coverage < MIN_COVERAGE:
+            why.append(f"커버리지 {coverage:.0f}% < {MIN_COVERAGE:.0f}%")
+        print("불합격 — " + ", ".join(why))
+    else:
+        print("합격")
+    sys.exit(0 if ok else 2)
 
 
 if __name__ == "__main__":
