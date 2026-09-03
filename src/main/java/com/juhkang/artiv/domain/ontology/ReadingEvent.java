@@ -84,7 +84,18 @@ public class ReadingEvent {
     public static ReadingEvent record(Long userId, Long seriesId, Long episodeId, int episodeNo,
                                       EntryPoint entryPoint, short progressPct, boolean completed,
                                       int dwellMs, UUID sessionId) {
-        return new ReadingEvent(Instant.now(), userId, seriesId, episodeId, episodeNo,
+        return recordAt(Instant.now(), userId, seriesId, episodeId, episodeNo,
+                entryPoint, progressPct, completed, dwellMs, sessionId);
+    }
+
+    /**
+     * 발생 시각을 지정해 생성. 세그먼트(AT_RISK·LAPSED)와 30일 창 로직은 과거 시각이 있어야
+     * 검증할 수 있는데 record()는 now로 고정돼 어떤 테스트도 그 경로를 밟지 못했다. 테스트 심이다.
+     */
+    public static ReadingEvent recordAt(Instant occurredAt, Long userId, Long seriesId, Long episodeId,
+                                        int episodeNo, EntryPoint entryPoint, short progressPct,
+                                        boolean completed, int dwellMs, UUID sessionId) {
+        return new ReadingEvent(occurredAt, userId, seriesId, episodeId, episodeNo,
                 entryPoint, progressPct, completed, dwellMs, sessionId);
     }
 }

@@ -27,19 +27,23 @@ import lombok.RequiredArgsConstructor;
  *
  * 집계 테이블도 MV도 두지 않는다: 데이터 규모가 작고, 배치를 추가하면 "집계가 안 돌았다"는
  * 새 실패 모드가 생긴다. 느려지면 idx_reading_events_* 위에 MV를 올리는 것이 승격 경로다.
+ *
+ * 창 적용 범위가 지표마다 다르다 — 요약·유입경로는 최근 30일, 잔존 곡선과 세그먼트는 생애 전체다.
+ * 잔존은 기간 지표가 아니라 퍼널이고, 세그먼트는 '지금 어떤 상태인가'라 창을 걸면 이탈이 사라진다.
+ * 화면은 이 차이를 반드시 라벨로 밝혀야 한다(같은 응답에서 요약 독자수와 세그먼트 합계가 다르다).
  */
 @Service
 @RequiredArgsConstructor
 public class InsightsService {
 
-    /** 분석 창(일) — 요약·유입경로·세그먼트에만 적용한다. 잔존 곡선은 생애 전체를 본다. */
+    /** 분석 창(일) — 요약·유입경로에만 적용한다. 잔존 곡선과 세그먼트는 생애 전체를 본다. */
     public static final int WINDOW_DAYS = 30;
     /** 저표본 기준 — 이보다 적으면 비율을 노출하지 않는다. */
     public static final int MIN_SAMPLE_FOR_RATE = 10;
     /** 절벽 판정: 단계 생존율이 중앙값의 이 비율 미만이면 절벽. */
     public static final double CLIFF_RATIO_FACTOR = 0.65;
-    /** 절벽 판정: 절대 낙폭 하한(%p) — 꼬리의 잡음을 거른다. */
-    public static final double CLIFF_MIN_DROP_PP = 5.0;
+    /** 절벽 판정: 직전 회차 대비 최소 상대 낙폭. 중앙 생존율이 1에 가까울 때 미세 흔들림을 거른다. */
+    public static final double CLIFF_MIN_RELATIVE_DROP = 0.20;
     /** 절벽 판정: 직전 회차 코호트가 이만큼은 돼야 비율을 신뢰한다. */
     public static final int CLIFF_MIN_COHORT = 5;
 
@@ -78,7 +82,12 @@ public class InsightsService {
         if (rows.isEmpty()) {
             return List.of();
         }
-        long base = ((Number) rows.get(0)[1]).longValue();   // 최초 회차 고유 독자
+        // 100% 기준선 = 가장 많이 도달한 회차. '첫 회차'로 잡으면 두 경우에 무너진다:
+        // (1) 계측 도입 이전에 연재된 작품은 1화에 이벤트가 없어 base가 엉뚱한 회차가 된다.
+        // (2) 중간 회차부터 유입된 독자가 있으면 후반 회차가 base를 넘어 잔존이 100%를 초과한다.
+        // 이 곡선은 엄밀한 코호트 퍼널이 아니라 '회차별 도달 독자' 곡선이며, 판정에 쓰는 것은
+        // 절대값이 아니라 이웃 회차 간 비율이라 기준선 선택이 절벽 탐지 결과를 바꾸지 않는다.
+        long base = rows.stream().mapToLong(r -> ((Number) r[1]).longValue()).max().orElse(0);
         List<RetentionPoint> out = new ArrayList<>(rows.size());
         for (Object[] r : rows) {
             int no = ((Number) r[0]).intValue();
@@ -102,7 +111,11 @@ public class InsightsService {
      * 그래서 retention[i]/retention[i-1] = 그 회차의 생존율을 보고, 중앙 생존율 대비
      * 65% 미만으로 떨어지는 첫 지점을 절벽으로 판정한다.
      *
-     * 잡음 방어 둘: 절대 낙폭 5%p 이상, 직전 코호트 5명 이상.
+     * 잡음 방어도 같은 단위(비율)로 건다. 초기 구현은 '절대 낙폭 5%p 이상'을 AND로 걸었는데,
+     * dropPp <= prev.retentionPct()가 항상 성립하므로 이 조건은 곧 prev.retentionPct() >= 5%를
+     * 요구하는 것이었다 — 잔존이 5% 아래로 내려간 뒤에는 코호트가 통째로 증발해도 절벽이
+     * 보고되지 않는다. 폐기했다고 적어둔 절대 %p 기준이 잡음 방어라는 이름으로 되살아나
+     * 장편(15화+) 후반 전체를 사각지대로 만들고 있었다(2026-09-03 리뷰에서 발견).
      */
     public Cliff detectCliff(List<RetentionPoint> retention) {
         if (retention.size() < 3) {
@@ -122,11 +135,11 @@ public class InsightsService {
         for (int i = 0; i < ratios.size(); i++) {
             RetentionPoint prev = retention.get(i);
             RetentionPoint curr = retention.get(i + 1);
-            double dropPp = prev.retentionPct() - curr.retentionPct();
-            if (ratios.get(i) < threshold
-                    && dropPp >= CLIFF_MIN_DROP_PP
+            double ratio = ratios.get(i);
+            if (ratio < threshold
+                    && (1.0 - ratio) >= CLIFF_MIN_RELATIVE_DROP
                     && prev.uniqueReaders() >= CLIFF_MIN_COHORT) {
-                return new Cliff(curr.episodeNo(), round1(dropPp));
+                return new Cliff(curr.episodeNo(), round1(prev.retentionPct() - curr.retentionPct()));
             }
         }
         return null;
@@ -184,9 +197,7 @@ public class InsightsService {
             counts.put(s, 0L);
         }
         for (Object[] r : readingEventRepository.readerActivityRows(seriesId)) {
-            Instant last = (Instant) r[0];
-            long sessions = ((Number) r[1]).longValue();
-            counts.merge(classify(last, sessions, now), 1L, Long::sum);
+            counts.merge(classify((Instant) r[0], (Instant) r[1], now), 1L, Long::sum);
         }
         return Arrays.stream(AudienceSegment.values())
                 .map(s -> {
@@ -198,16 +209,20 @@ public class InsightsService {
                 .toList();
     }
 
-    private AudienceSegment classify(Instant lastRead, long sessions, Instant now) {
-        long daysSince = Duration.between(lastRead, now).toDays();
-        if (daysSince > AudienceSegment.ACTIVE_DAYS) {
+    /**
+     * 상호배타·전수 분류. 축은 둘 — 마지막 열람의 최근성(이탈 여부), 첫 열람의 최근성(신규 여부).
+     * NEW를 마지막 열람으로 판정하면 '3개월 된 독자가 어제 다시 읽음'을 신규로 세게 된다.
+     */
+    private AudienceSegment classify(Instant firstRead, Instant lastRead, Instant now) {
+        long sinceLast = Duration.between(lastRead, now).toDays();
+        if (sinceLast > AudienceSegment.ACTIVE_DAYS) {
             return AudienceSegment.LAPSED;
         }
-        if (daysSince > AudienceSegment.NEW_DAYS) {
+        if (sinceLast > AudienceSegment.NEW_DAYS) {
             return AudienceSegment.AT_RISK;
         }
-        return sessions >= AudienceSegment.LOYAL_MIN_SESSIONS
-                ? AudienceSegment.LOYAL : AudienceSegment.NEW;
+        return Duration.between(firstRead, now).toDays() <= AudienceSegment.NEW_DAYS
+                ? AudienceSegment.NEW : AudienceSegment.LOYAL;
     }
 
     // ── 유틸 ────────────────────────────────────────────────────────────

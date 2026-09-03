@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -49,12 +50,33 @@ public interface ReadingEventRepository extends JpaRepository<ReadingEvent, Long
             """)
     List<Object[]> summaryRows(@Param("seriesId") Long seriesId, @Param("from") Instant from);
 
-    /** 독자별 (마지막 열람, 세션 수) — 세그먼트 분류의 원재료. 개인 id는 반환하지 않는다. */
+    /**
+     * 독자별 (첫 열람, 마지막 열람) — 세그먼트 분류의 원재료. 개인 id는 반환하지 않는다.
+     *
+     * 30일 창을 걸지 않는다: 창을 걸면 LAPSED(30일 초과 무열람) 독자가 조회 대상에서 빠져
+     * 구조적으로 0이 된다. 세그먼트는 생애 기준 상태 분류다(AudienceSegment 주석 참조).
+     * NEW 판정에 첫 열람이 필요해 min도 함께 가져온다 — max만 있으면 '오래된 독자가 어제 다시 읽음'을
+     * 신규로 오분류한다.
+     */
     @Query("""
-            select max(e.occurredAt), count(e)
+            select min(e.occurredAt), max(e.occurredAt)
             from ReadingEvent e
             where e.seriesId = :seriesId and e.userId is not null
             group by e.userId
             """)
     List<Object[]> readerActivityRows(@Param("seriesId") Long seriesId);
+
+    /**
+     * 탈퇴 시 익명화 — 행은 남기고 사용자 연결만 끊는다(설계문서 §9).
+     *
+     * FK의 on delete set null에 기댈 수 없다: 이 프로젝트의 탈퇴는 soft delete(User.withdraw()가
+     * deletedAt만 찍고 행을 남김)라 FK가 영원히 발화하지 않는다. 그래서 명시적으로 지운다.
+     *
+     * flushAutomatically가 없으면 같은 트랜잭션에서 더티체킹으로 잡아둔 변경(User.withdraw()의
+     * deletedAt·센티널 치환)이 벌크 UPDATE 뒤의 컨텍스트 clear에 함께 버려져 탈퇴가 통째로 무효화된다
+     * (2026-09-03 WithdrawalFlowTest가 잡아냄).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ReadingEvent e set e.userId = null where e.userId = :userId")
+    int anonymizeUser(@Param("userId") Long userId);
 }

@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.juhkang.artiv.domain.auth.RefreshTokenRepository;
 import com.juhkang.artiv.domain.series.SeriesRepository;
+import com.juhkang.artiv.domain.ontology.ReadingEventRepository;
 import com.juhkang.artiv.domain.user.dto.MyProfileResponse;
 import com.juhkang.artiv.domain.user.dto.UserProfileResponse;
 import com.juhkang.artiv.domain.user.dto.UserResponse;
@@ -29,6 +30,7 @@ public class UserService {
     private final ImageStorageService imageStorageService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SeriesRepository seriesRepository;
+    private final ReadingEventRepository readingEventRepository;
 
     public UserResponse getMyInfo(Long userId) {
         return UserResponse.of(load(userId));
@@ -118,6 +120,10 @@ public class UserService {
         if (user.getRole() == Role.CREATOR) {
             seriesRepository.findByAuthorId(userId).forEach(series -> series.changeVisibility(false));
         }
+        // 열람 계측 익명화 — 행은 남기고 사용자 연결만 끊는다(설계문서 §9). 탈퇴가 soft delete라
+        // reading_events의 FK on delete set null은 발화하지 않으므로 명시적으로 지운다.
+        // 벌크 UPDATE가 컨텍스트를 비우므로 반드시 마지막에 — 앞의 더티체킹 변경을 삼키지 않게 한다.
+        readingEventRepository.anonymizeUser(userId);
     }
 
     private MyProfileResponse toProfile(User user) {
