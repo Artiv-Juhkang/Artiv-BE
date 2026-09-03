@@ -32,14 +32,16 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class InsightsService {
 
-    /** 분석 창(일). */
+    /** 분석 창(일) — 요약·유입경로·세그먼트에만 적용한다. 잔존 곡선은 생애 전체를 본다. */
     public static final int WINDOW_DAYS = 30;
     /** 저표본 기준 — 이보다 적으면 비율을 노출하지 않는다. */
     public static final int MIN_SAMPLE_FOR_RATE = 10;
-    /** 절벽 판정: 중앙값 낙폭의 이 배수 이상. */
-    public static final double CLIFF_MEDIAN_FACTOR = 2.0;
-    /** 절벽 판정: 절대 낙폭 하한(%p). */
-    public static final double CLIFF_MIN_DROP_PP = 15.0;
+    /** 절벽 판정: 단계 생존율이 중앙값의 이 비율 미만이면 절벽. */
+    public static final double CLIFF_RATIO_FACTOR = 0.65;
+    /** 절벽 판정: 절대 낙폭 하한(%p) — 꼬리의 잡음을 거른다. */
+    public static final double CLIFF_MIN_DROP_PP = 5.0;
+    /** 절벽 판정: 직전 회차 코호트가 이만큼은 돼야 비율을 신뢰한다. */
+    public static final int CLIFF_MIN_COHORT = 5;
 
     private final ReadingEventRepository readingEventRepository;
     private final OntologyAccessChecker accessChecker;
@@ -51,7 +53,7 @@ public class InsightsService {
         Instant to = Instant.now();
         Instant from = to.minus(Duration.ofDays(WINDOW_DAYS));
 
-        List<RetentionPoint> retention = buildRetention(seriesId, from);
+        List<RetentionPoint> retention = buildRetention(seriesId);
         Cliff cliff = detectCliff(retention);
         List<RetentionPoint> marked = markCliff(retention, cliff);
 
@@ -71,8 +73,8 @@ public class InsightsService {
 
     // ── 잔존 ────────────────────────────────────────────────────────────
 
-    private List<RetentionPoint> buildRetention(Long seriesId, Instant from) {
-        List<Object[]> rows = readingEventRepository.retentionRows(seriesId, from);
+    private List<RetentionPoint> buildRetention(Long seriesId) {
+        List<Object[]> rows = readingEventRepository.retentionRows(seriesId);
         if (rows.isEmpty()) {
             return List.of();
         }
@@ -92,25 +94,39 @@ public class InsightsService {
     }
 
     /**
-     * 절벽 = 직전 회차 대비 낙폭이 (중앙값 낙폭 × 2) 이상이고 절대 15%p 이상인 첫 지점.
-     * 낙폭이 충분히 크지 않으면 절벽 없음(null).
+     * 절벽 = 단계별 조건부 잔존율이 평소보다 급격히 나쁜 첫 지점.
+     *
+     * 절대 %p 낙폭을 쓰지 않는 이유: 잔존은 기하급수적으로 감소하므로 1→2화의 %p 낙폭이
+     * 항상 가장 크고, 후반의 진짜 절벽은 코호트가 이미 작아 %p로는 묻힌다. 2026-09-03
+     * seed-truth 대조에서 실제로 불일치 5건이 전부 2화를 가리켰다(정확도 47%).
+     * 그래서 retention[i]/retention[i-1] = 그 회차의 생존율을 보고, 중앙 생존율 대비
+     * 65% 미만으로 떨어지는 첫 지점을 절벽으로 판정한다.
+     *
+     * 잡음 방어 둘: 절대 낙폭 5%p 이상, 직전 코호트 5명 이상.
      */
     public Cliff detectCliff(List<RetentionPoint> retention) {
         if (retention.size() < 3) {
             return null;
         }
-        List<Double> drops = new ArrayList<>();
+        List<Double> ratios = new ArrayList<>();
         for (int i = 1; i < retention.size(); i++) {
-            drops.add(Math.max(0.0, retention.get(i - 1).retentionPct() - retention.get(i).retentionPct()));
+            long prev = retention.get(i - 1).uniqueReaders();
+            long curr = retention.get(i).uniqueReaders();
+            ratios.add(prev == 0 ? 1.0 : (double) curr / prev);
         }
-        List<Double> sorted = new ArrayList<>(drops);
+        List<Double> sorted = new ArrayList<>(ratios);
         sorted.sort(Double::compareTo);
-        double median = sorted.get(sorted.size() / 2);
-        double threshold = Math.max(median * CLIFF_MEDIAN_FACTOR, CLIFF_MIN_DROP_PP);
+        double medianRatio = sorted.get(sorted.size() / 2);
+        double threshold = medianRatio * CLIFF_RATIO_FACTOR;
 
-        for (int i = 0; i < drops.size(); i++) {
-            if (drops.get(i) >= threshold) {
-                return new Cliff(retention.get(i + 1).episodeNo(), round1(drops.get(i)));
+        for (int i = 0; i < ratios.size(); i++) {
+            RetentionPoint prev = retention.get(i);
+            RetentionPoint curr = retention.get(i + 1);
+            double dropPp = prev.retentionPct() - curr.retentionPct();
+            if (ratios.get(i) < threshold
+                    && dropPp >= CLIFF_MIN_DROP_PP
+                    && prev.uniqueReaders() >= CLIFF_MIN_COHORT) {
+                return new Cliff(curr.episodeNo(), round1(dropPp));
             }
         }
         return null;

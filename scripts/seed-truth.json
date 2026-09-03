@@ -1,0 +1,296 @@
+{
+  "generatedAt": "2026-09-03T06:20:07+00:00",
+  "seed": 20260903,
+  "windowDays": 90,
+  "events": 3563,
+  "works": [
+    {
+      "seriesId": 1,
+      "title": "별빛 너머의 항해",
+      "episodes": 7,
+      "cliffEpisodeNo": 5,
+      "audience": 27,
+      "quality": 0.863
+    },
+    {
+      "seriesId": 2,
+      "title": "어제의 골목",
+      "episodes": 5,
+      "cliffEpisodeNo": 5,
+      "audience": 25,
+      "quality": 0.783
+    },
+    {
+      "seriesId": 3,
+      "title": "검은 고양이 탐정",
+      "episodes": 8,
+      "cliffEpisodeNo": 5,
+      "audience": 40,
+      "quality": 0.553
+    },
+    {
+      "seriesId": 4,
+      "title": "심야 식당의 비밀",
+      "episodes": 5,
+      "cliffEpisodeNo": 5,
+      "audience": 35,
+      "quality": 0.722
+    },
+    {
+      "seriesId": 5,
+      "title": "부서진 왕관",
+      "episodes": 7,
+      "cliffEpisodeNo": 6,
+      "audience": 43,
+      "quality": 0.619
+    },
+    {
+      "seriesId": 6,
+      "title": "웃음 배달부",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 44,
+      "quality": 0.619
+    },
+    {
+      "seriesId": 7,
+      "title": "붉은 방",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 38,
+      "quality": 0.884
+    },
+    {
+      "seriesId": 8,
+      "title": "열한 번째 여름",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 39,
+      "quality": 0.594
+    },
+    {
+      "seriesId": 11,
+      "title": "밤의 라디오",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 34,
+      "quality": 0.796
+    },
+    {
+      "seriesId": 31,
+      "title": "별빛 너머의 항해",
+      "episodes": 7,
+      "cliffEpisodeNo": 5,
+      "audience": 43,
+      "quality": 0.782
+    },
+    {
+      "seriesId": 32,
+      "title": "어제의 골목",
+      "episodes": 5,
+      "cliffEpisodeNo": 5,
+      "audience": 39,
+      "quality": 0.583
+    },
+    {
+      "seriesId": 33,
+      "title": "검은 고양이 탐정",
+      "episodes": 8,
+      "cliffEpisodeNo": 8,
+      "audience": 28,
+      "quality": 0.779
+    },
+    {
+      "seriesId": 34,
+      "title": "심야 식당의 비밀",
+      "episodes": 5,
+      "cliffEpisodeNo": 4,
+      "audience": 22,
+      "quality": 0.813
+    },
+    {
+      "seriesId": 35,
+      "title": "부서진 왕관",
+      "episodes": 7,
+      "cliffEpisodeNo": 6,
+      "audience": 21,
+      "quality": 0.893
+    },
+    {
+      "seriesId": 36,
+      "title": "웃음 배달부",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 32,
+      "quality": 0.794
+    },
+    {
+      "seriesId": 37,
+      "title": "붉은 방",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 32,
+      "quality": 0.717
+    },
+    {
+      "seriesId": 38,
+      "title": "열한 번째 여름",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 25,
+      "quality": 0.866
+    },
+    {
+      "seriesId": 41,
+      "title": "밤의 라디오",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 32,
+      "quality": 0.91
+    },
+    {
+      "seriesId": 60,
+      "title": "별빛 너머의 항해",
+      "episodes": 7,
+      "cliffEpisodeNo": 5,
+      "audience": 48,
+      "quality": 0.889
+    },
+    {
+      "seriesId": 61,
+      "title": "어제의 골목",
+      "episodes": 5,
+      "cliffEpisodeNo": 5,
+      "audience": 34,
+      "quality": 0.918
+    },
+    {
+      "seriesId": 62,
+      "title": "검은 고양이 탐정",
+      "episodes": 8,
+      "cliffEpisodeNo": 7,
+      "audience": 47,
+      "quality": 0.614
+    },
+    {
+      "seriesId": 63,
+      "title": "심야 식당의 비밀",
+      "episodes": 5,
+      "cliffEpisodeNo": 4,
+      "audience": 27,
+      "quality": 0.745
+    },
+    {
+      "seriesId": 64,
+      "title": "부서진 왕관",
+      "episodes": 7,
+      "cliffEpisodeNo": 4,
+      "audience": 48,
+      "quality": 0.908
+    },
+    {
+      "seriesId": 65,
+      "title": "웃음 배달부",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 44,
+      "quality": 0.796
+    },
+    {
+      "seriesId": 66,
+      "title": "붉은 방",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 27,
+      "quality": 0.889
+    },
+    {
+      "seriesId": 67,
+      "title": "열한 번째 여름",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 30,
+      "quality": 0.876
+    },
+    {
+      "seriesId": 70,
+      "title": "밤의 라디오",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 45,
+      "quality": 0.593
+    },
+    {
+      "seriesId": 89,
+      "title": "별빛 너머의 항해",
+      "episodes": 7,
+      "cliffEpisodeNo": 7,
+      "audience": 41,
+      "quality": 0.761
+    },
+    {
+      "seriesId": 90,
+      "title": "어제의 골목",
+      "episodes": 5,
+      "cliffEpisodeNo": 3,
+      "audience": 38,
+      "quality": 0.824
+    },
+    {
+      "seriesId": 91,
+      "title": "검은 고양이 탐정",
+      "episodes": 8,
+      "cliffEpisodeNo": 5,
+      "audience": 31,
+      "quality": 0.919
+    },
+    {
+      "seriesId": 92,
+      "title": "심야 식당의 비밀",
+      "episodes": 5,
+      "cliffEpisodeNo": 4,
+      "audience": 21,
+      "quality": 0.76
+    },
+    {
+      "seriesId": 93,
+      "title": "부서진 왕관",
+      "episodes": 7,
+      "cliffEpisodeNo": 5,
+      "audience": 35,
+      "quality": 0.911
+    },
+    {
+      "seriesId": 94,
+      "title": "웃음 배달부",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 26,
+      "quality": 0.64
+    },
+    {
+      "seriesId": 95,
+      "title": "붉은 방",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 47,
+      "quality": 0.876
+    },
+    {
+      "seriesId": 96,
+      "title": "열한 번째 여름",
+      "episodes": 4,
+      "cliffEpisodeNo": 4,
+      "audience": 29,
+      "quality": 0.587
+    },
+    {
+      "seriesId": 99,
+      "title": "밤의 라디오",
+      "episodes": 4,
+      "cliffEpisodeNo": 3,
+      "audience": 24,
+      "quality": 0.802
+    }
+  ]
+}
