@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.juhkang.artiv.domain.ontology.dto.NudgeRequest;
 import com.juhkang.artiv.domain.ontology.dto.OntologySchemaResponse;
 import com.juhkang.artiv.domain.ontology.dto.ReadingEventRequest;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse;
+import com.juhkang.artiv.global.exception.BusinessException;
+import com.juhkang.artiv.global.exception.ErrorCode;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class OntologyController {
 
     private final ReadingEventService readingEventService;
+    private final NudgeService nudgeService;
     private final InsightsService insightsService;
 
     @GetMapping("/api/ontology/schema")
@@ -41,6 +45,27 @@ public class OntologyController {
     public WorkInsightsResponse insights(@AuthenticationPrincipal Long userId,
                                          @PathVariable Long seriesId) {
         return insightsService.diagnose(seriesId, userId);
+    }
+
+    /**
+     * 이탈 독자 알림 실행. 성공은 200 + 빈 바디 — **수신자 수를 반환하지 않는다.**
+     *
+     * 진단이 "LAPSED 6명"을 보여주는데 액션이 "5명에게 보냈어요"를 반환하면 그 차이가 곧
+     * "나를 차단했거나 탈퇴한 사람 수"다. k=5를 도입한 근거(소수 델타 + 댓글 닉네임 대조로
+     * 개인 특정)가 델타 1~2에도 그대로 적용되고, 주 단위로 반복하면 시계열 델타까지 얻는다.
+     *
+     * 서비스가 던지지 않은 거부를 **트랜잭션 밖에서** 예외로 번역한다(NudgeService.execute 주석 참조).
+     */
+    @PostMapping("/api/ontology/actions/nudge-lapsed-audience")
+    @PreAuthorize("hasRole('CREATOR')")
+    public void nudgeLapsedAudience(@AuthenticationPrincipal Long userId,
+                                    @Valid @RequestBody NudgeRequest req) {
+        ActionResult result = nudgeService.execute(req.seriesId(), userId);
+        switch (result) {
+            case BLOCKED_THROTTLED -> throw new BusinessException(ErrorCode.ACTION_THROTTLED);
+            case BLOCKED_TOO_SMALL -> throw new BusinessException(ErrorCode.SEGMENT_TOO_SMALL);
+            case EXECUTED -> { }
+        }
     }
 
     @PostMapping("/api/reading-events")
