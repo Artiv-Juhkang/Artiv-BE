@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.juhkang.artiv.domain.ontology.dto.NudgeRequest;
 import com.juhkang.artiv.domain.ontology.dto.OntologySchemaResponse;
+import com.juhkang.artiv.domain.ontology.dto.SharedAudienceResponse;
 import com.juhkang.artiv.domain.ontology.dto.ReadingEventRequest;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse;
 import com.juhkang.artiv.global.exception.BusinessException;
@@ -34,6 +35,7 @@ public class OntologyController {
     private final ReadingEventService readingEventService;
     private final NudgeService nudgeService;
     private final InsightsService insightsService;
+    private final SharedAudienceService sharedAudienceService;
 
     @GetMapping("/api/ontology/schema")
     public OntologySchemaResponse schema() {
@@ -45,6 +47,13 @@ public class OntologyController {
     public WorkInsightsResponse insights(@AuthenticationPrincipal Long userId,
                                          @PathVariable Long seriesId) {
         return insightsService.diagnose(seriesId, userId);
+    }
+
+    @GetMapping("/api/ontology/works/{seriesId}/shared-audience")
+    @PreAuthorize("hasRole('CREATOR')")
+    public SharedAudienceResponse sharedAudience(@AuthenticationPrincipal Long userId,
+                                                 @PathVariable Long seriesId) {
+        return sharedAudienceService.of(seriesId, userId);
     }
 
     /**

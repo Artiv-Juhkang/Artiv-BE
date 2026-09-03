@@ -1,9 +1,13 @@
 package com.juhkang.artiv.domain.ontology;
 
+import java.time.LocalDate;
+
 import org.springframework.stereotype.Component;
 
+import com.juhkang.artiv.domain.series.AgeRating;
 import com.juhkang.artiv.domain.series.Series;
 import com.juhkang.artiv.domain.series.SeriesRepository;
+import com.juhkang.artiv.domain.user.User;
 import com.juhkang.artiv.global.exception.BusinessException;
 import com.juhkang.artiv.global.exception.ErrorCode;
 
@@ -43,5 +47,25 @@ public class OntologyAccessChecker {
     /** k-익명성 판정. false면 크기를 노출하지 않고 액션도 막는다. */
     public boolean isDisclosable(long segmentSize) {
         return segmentSize >= MIN_SEGMENT_SIZE;
+    }
+
+    /**
+     * 링크 목록에 이 작품을 노출해도 되는가(가시성 전파).
+     *
+     * SeriesAccessChecker.verifyInteractable을 재사용하지 않는다 — 그건 예외를 던지는 가드라
+     * 목록 필터로 쓰면 **첫 비공개 작품에서 응답 전체가 404**가 된다. 구조적으로 재사용 불가다.
+     *
+     * 다만 판정 축은 기존과 반드시 일치해야 한다: 성인 판정은 ageRating == AGE_19이지
+     * adultOnly가 아니다. 불변식이 adultOnly ⇒ AGE_19 **한 방향뿐**이라 adultOnly를 기준으로
+     * 잡으면 adultOnly=false인 AGE_19 작품이 미성년 요청자에게 샌다.
+     */
+    public boolean isLinkable(Series other, User viewer) {
+        if (other.isAuthoredBy(viewer.getId())) {
+            return true;
+        }
+        if (!other.isVisible()) {
+            return false;
+        }
+        return other.getAgeRating() != AgeRating.AGE_19 || viewer.isAdult(LocalDate.now());
     }
 }

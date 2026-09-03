@@ -67,6 +67,36 @@ public interface ReadingEventRepository extends JpaRepository<ReadingEvent, Long
     List<Object[]> readerActivityRows(@Param("seriesId") Long seriesId);
 
     /**
+     * 내 작품의 고유 독자 수 — shareOfMyAudience의 **분모**. 방향성 제약의 실체다.
+     * 비율의 분모가 항상 내 쪽이어야 상대 작품의 독자 규모가 역산되지 않는다.
+     */
+    @Query("""
+            select count(distinct e.userId)
+            from ReadingEvent e
+            where e.seriesId = :seriesId and e.userId is not null
+            """)
+    long myReaderCount(@Param("seriesId") Long seriesId);
+
+    /**
+     * 내 독자가 함께 본 다른 작품과 그 겹침 인원 — sharesAudienceWith 파생 링크.
+     *
+     * 세 쿼리(myReaderCount·이것·lapsedReaderIds) 전부에 `userId is not null`이 들어갔는지가
+     * 단일 리뷰 체크포인트다. 하나만 빠져도 익명 이벤트가 한 명의 독자로 뭉쳐
+     * 겹침 수가 부풀고 k-익명성이 무의미해진다.
+     */
+    @Query("""
+            select e.seriesId, count(distinct e.userId)
+            from ReadingEvent e
+            where e.userId is not null
+              and e.seriesId <> :seriesId
+              and e.userId in (select e2.userId from ReadingEvent e2
+                               where e2.seriesId = :seriesId and e2.userId is not null)
+            group by e.seriesId
+            order by count(distinct e.userId) desc
+            """)
+    List<Object[]> overlapRows(@Param("seriesId") Long seriesId);
+
+    /**
      * 이탈 독자의 개인 id — **이 리포지토리에서 개인 id를 반환하는 유일한 쿼리다.**
      *
      * readerActivityRows의 정반대 계약이므로(그쪽은 집계만 돌려주고 id를 일부러 감춘다)
