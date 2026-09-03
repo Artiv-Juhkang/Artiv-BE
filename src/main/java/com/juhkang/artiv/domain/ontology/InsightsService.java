@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.Cliff;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.EntryPointShare;
+import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.LastAction;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.RetentionPoint;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.SegmentSize;
 import com.juhkang.artiv.domain.ontology.dto.WorkInsightsResponse.Summary;
@@ -48,6 +49,7 @@ public class InsightsService {
     public static final int CLIFF_MIN_COHORT = 5;
 
     private final ReadingEventRepository readingEventRepository;
+    private final OntologyActionLogRepository logRepository;
     private final OntologyAccessChecker accessChecker;
 
     @Transactional(readOnly = true)
@@ -72,7 +74,17 @@ public class InsightsService {
                 cliff,
                 buildEntryPoints(seriesId, from),
                 buildSegments(seriesId, to),
-                Arrays.stream(ActionType.values()).map(Enum::name).toList());
+                Arrays.stream(ActionType.values()).map(Enum::name).toList(),
+                lastAction(seriesId));
+    }
+
+    /** 성공한 최신 액션 1건. 거부된 시도는 화면에 올리지 않는다(작가가 이미 응답으로 봤다). */
+    private LastAction lastAction(Long seriesId) {
+        return logRepository
+                .findTopByObjectIdAndResultOrderByOccurredAtDesc(seriesId, ActionResult.EXECUTED)
+                .map(l -> new LastAction(l.getActionType().name(), l.getActionType().getLabel(),
+                        l.getOccurredAt()))
+                .orElse(null);
     }
 
     // ── 잔존 ────────────────────────────────────────────────────────────

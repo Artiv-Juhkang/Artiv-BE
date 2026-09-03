@@ -1,8 +1,10 @@
 package com.juhkang.artiv.domain.ontology;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.DayOfWeek;
@@ -199,6 +201,20 @@ class NudgeActionTest {
 
         assertThat(notificationRepository.count()).isZero();
         assertThat(logRepository.count()).isZero();
+    }
+
+    /** 루프 ④ — 실행이 진단 화면으로 되돌아온다. */
+    @Test
+    void 실행_후_진단에_lastAction이_나타난다() throws Exception {
+        lapsedSubscribers(5);
+        nudge(creatorToken).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/ontology/works/" + work.getId() + "/insights")
+                        .header("Authorization", "Bearer " + creatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastAction.actionType").value("NUDGE_LAPSED_AUDIENCE"))
+                .andExpect(jsonPath("$.lastAction.label").value("이탈 독자 알림"))
+                .andExpect(jsonPath("$.lastAction.occurredAt").exists());
     }
 
     @Test

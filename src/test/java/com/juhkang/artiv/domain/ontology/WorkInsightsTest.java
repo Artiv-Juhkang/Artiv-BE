@@ -128,6 +128,14 @@ class WorkInsightsTest {
     }
 
     @Test
+    void 액션_이력이_없으면_lastAction이_null이다() throws Exception {
+        mockMvc.perform(get("/api/ontology/works/" + seriesId + "/insights")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastAction").doesNotExist());
+    }
+
+    @Test
     void 적용가능_액션이_함께_내려온다() throws Exception {
         mockMvc.perform(get("/api/ontology/works/" + seriesId + "/insights")
                         .header("Authorization", "Bearer " + ownerToken))

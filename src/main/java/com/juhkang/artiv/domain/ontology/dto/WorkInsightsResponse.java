@@ -20,7 +20,8 @@ public record WorkInsightsResponse(
         Cliff cliff,
         List<EntryPointShare> entryPoints,
         List<SegmentSize> segments,
-        List<String> applicableActions) {
+        List<String> applicableActions,
+        LastAction lastAction) {
 
     public record Window(int days, Instant from, Instant to) {
     }
@@ -39,5 +40,15 @@ public record WorkInsightsResponse(
     }
 
     public record SegmentSize(String segment, String label, String rule, Long size, boolean disclosed) {
+    }
+
+    /**
+     * 마지막으로 실행된 액션. 이력이 없으면 null.
+     *
+     * 결정→액션→측정 루프의 ④는 여기까지다. "액션 이후 신규 독자 N명" 같은 복귀율 수치는
+     * 만들지 않는다 — 대조군이 없어 인과가 아니고, 시더가 모든 이벤트를 과거 시각으로 한 번에
+     * 넣으므로 데모에서 그 숫자는 구조적으로 0이다. 실행 사실만 정직하게 올린다.
+     */
+    public record LastAction(String actionType, String label, Instant occurredAt) {
     }
 }

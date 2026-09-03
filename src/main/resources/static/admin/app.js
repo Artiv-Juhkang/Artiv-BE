@@ -530,7 +530,8 @@
           ${stat(d.summary.uniqueReaders, '고유 독자')}
           ${stat(pct(d.summary.completionRate), '완독률')}
         </div>
-        <p class="muted">원자료 ${d.summary.sampleSize}건 기준 · 10건 미만이면 비율을 표시하지 않습니다.</p>
+        <p class="muted">원자료 ${d.summary.sampleSize}건 기준 · 10건 미만이면 비율을 표시하지 않습니다.
+          ${d.lastAction ? `· 마지막 액션: <b>${esc(d.lastAction.label)}</b> (${new Date(d.lastAction.occurredAt).toLocaleString('ko-KR')})` : ''}</p>
 
         <section class="panel ins">
           <h3>회차별 잔존</h3>
@@ -553,7 +554,7 @@
         <section class="panel ins">
           <h3>적용 가능 액션</h3>
           <div class="segrow">${acts}</div>
-          <p class="muted">액션 실행 UI는 Phase B에서 붙습니다.</p>
+          <p class="muted">액션 실행은 앱 스튜디오에서 합니다.</p>
         </section>`);
       bindGo();
     } catch (e) { setMain(errBox(e)); }
