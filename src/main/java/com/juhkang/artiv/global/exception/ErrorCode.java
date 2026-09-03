@@ -21,6 +21,10 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     ADULT_ONLY(HttpStatus.FORBIDDEN, "성인만 열람할 수 있습니다."),
+    // 온톨로지 액션 가드. 429 대신 409를 쓰는 이유는 이것이 요청 빈도 제한이 아니라
+    // "이번 주에는 이미 보냈다"는 상태 충돌이기 때문이다.
+    ACTION_THROTTLED(HttpStatus.CONFLICT, "이번 주에는 이미 보냈어요. 다음 주에 다시 시도할 수 있어요."),
+    SEGMENT_TOO_SMALL(HttpStatus.FORBIDDEN, "대상이 5명 미만이면 개인 식별 위험이 있어 보낼 수 없어요."),
     INVALID_IMAGE(HttpStatus.BAD_REQUEST, "이미지 파일이 올바르지 않습니다."),
     STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
