@@ -43,6 +43,7 @@ MIN_EPISODES = 4                # 잔존 곡선이 의미를 가지려면 회차
 WINDOW_DAYS = 90
 ENTRY_SUBSCRIBER = ["SUBSCRIPTION"] * 3 + ["NOTIFICATION"] * 2 + ["DIRECT"]
 ENTRY_NEW = ["DISCOVER"] * 3 + ["SEARCH"] * 2 + ["AUTHOR"]
+SUBSCRIBE_RATE = 0.6            # 합성 독자 중 구독까지 하는 비율(= NUDGE 수신 동의)
 
 
 def psql(sql):
@@ -104,9 +105,16 @@ def progress_of(rng, retained):
     return max(0, min(100, int(100 * p)))
 
 
-def generate(rng, works, subs_by_series, reader_pool, now):
+def generate(rng, works, subs_by_series, reader_pool, now, sub_rng):
+    """이벤트와 함께, 사후 삽입할 구독 쌍도 모은다.
+
+    구독 대상은 **별도 rng(sub_rng)** 로 뽑는다. 같은 rng에서 뽑으면 난수 스트림이 밀려
+    이벤트가 통째로 달라지고 seed-truth.json의 절벽 정답이 이동한다. 삽입 자체도 이벤트
+    COPY가 끝난 뒤에 한다 — 미리 넣으면 load_subscriptions()가 그것을 읽어 is_sub=True가
+    되고 ENTRY 분포와 잔존 가중이 바뀐다.
+    """
     window_start = now - timedelta(days=WINDOW_DAYS)
-    events, truth = [], []
+    events, truth, new_subs = [], [], []
 
     for w in works:
         eps = sorted(w["episodes"], key=lambda e: e["no"])
@@ -145,15 +153,31 @@ def generate(rng, works, subs_by_series, reader_pool, now):
                 if not retained:
                     break
 
+        # 수신 동의(=구독)를 심는다. 이게 없으면 NUDGE 대상이 전원 필터되어 0건 발송이 된다.
+        for uid, is_sub in audience:
+            if not is_sub and sub_rng.random() < SUBSCRIBE_RATE:
+                new_subs.append((w["seriesId"], uid))
+
         truth.append({"seriesId": w["seriesId"], "title": w["title"], "episodes": n,
                       "cliffEpisodeNo": cliff_no, "audience": len(audience),
                       "quality": round(quality, 3)})
-    return events, truth
+    return events, truth, new_subs
 
 
 def _uuid(rng):
     h = f"{rng.getrandbits(128):032x}"
     return f"{h[:8]}-{h[8:12]}-4{h[13:16]}-a{h[17:20]}-{h[20:32]}"
+
+
+def insert_subscriptions(pairs):
+    """수신 동의(구독)를 심는다. 이벤트 COPY 이후에만 호출한다 — 미리 넣으면
+    load_subscriptions()가 그것을 읽어 is_sub=True가 되고 ENTRY 분포·잔존 가중이 바뀐다."""
+    if not pairs:
+        return 0
+    values = ", ".join(f"({sid}, {uid}, now(), now())" for sid, uid in pairs)
+    psql("insert into subscriptions (series_id, user_id, created_at, updated_at) values "
+         + values + " on conflict do nothing;")
+    return len(pairs)
 
 
 def insert(events):
@@ -197,9 +221,11 @@ def main():
     print(f"합성 독자 {len(readers)}명 확보")
 
     subs = load_subscriptions()
-    events, truth = generate(rng, works, subs, readers, now)
+    events, truth, new_subs = generate(rng, works, subs, readers, now, random.Random(args.seed + 1))
     print(f"이벤트 {len(events):,}건 생성 — COPY 적재 중")
     insert(events)
+    n_sub = insert_subscriptions(new_subs)
+    print(f"구독(수신 동의) {n_sub:,}건 삽입 — NUDGE 대상이 존재하려면 필요하다")
 
     payload = {"generatedAt": now.isoformat(), "seed": args.seed,
                "windowDays": WINDOW_DAYS, "events": len(events), "works": truth}
