@@ -1,5 +1,9 @@
 package com.juhkang.artiv.domain.ontology;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
 /**
  * 독자 세그먼트 — 파생 객체. 백킹 테이블이 없고 열람 이력에서 계산된다.
  *
@@ -22,6 +26,26 @@ public enum AudienceSegment {
     public static final int NEW_DAYS = 14;
     /** 활동으로 인정하는 최대 경과일. 이보다 오래되면 이탈. */
     public static final int ACTIVE_DAYS = 30;
+
+    /**
+     * 이탈 판정 — 화면(classify)과 발송 대상 쿼리가 **반드시 이 술어 하나를 공유해야 한다**.
+     *
+     * 정의가 두 벌이면 조용히 갈라진다: classify는 toDays() > 30(경과 31일 이상)인데
+     * 순진한 쿼리 max(occurredAt) < now-30d 는 경과 30일 초과라, 30.0~31.0일 구간 독자가
+     * 화면에서는 AT_RISK인데 발송 대상에는 들어간다. k 게이트도 한쪽 기준으로만 통과하고
+     * 감사 로그의 recipient_count가 화면 숫자와 어긋난다.
+     */
+    public static boolean isLapsed(Instant lastRead, Instant now) {
+        return Duration.between(lastRead, now).toDays() > ACTIVE_DAYS;
+    }
+
+    /**
+     * 위 술어와 등가인 SQL 경계. `max(occurredAt) <= cutoff` 로 쓴다.
+     * isLapsed와 같은 집합을 고르는지는 NudgeAudienceTest의 경계 케이스(30.5일/31.5일)가 지킨다.
+     */
+    public static Instant lapsedCutoff(Instant now) {
+        return now.minus(ACTIVE_DAYS + 1L, ChronoUnit.DAYS);
+    }
 
     private final String label;
     private final String rule;

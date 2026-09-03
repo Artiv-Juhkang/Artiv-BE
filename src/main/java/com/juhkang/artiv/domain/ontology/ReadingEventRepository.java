@@ -67,6 +67,22 @@ public interface ReadingEventRepository extends JpaRepository<ReadingEvent, Long
     List<Object[]> readerActivityRows(@Param("seriesId") Long seriesId);
 
     /**
+     * 이탈 독자의 개인 id — **이 리포지토리에서 개인 id를 반환하는 유일한 쿼리다.**
+     *
+     * readerActivityRows의 정반대 계약이므로(그쪽은 집계만 돌려주고 id를 일부러 감춘다)
+     * 결과가 서비스 밖으로 나가면 안 된다. DTO·응답·로그 어디에도 실리지 않는다.
+     * cutoff는 반드시 AudienceSegment.lapsedCutoff()에서 받는다 — 직접 계산하면 화면과 갈라진다.
+     */
+    @Query("""
+            select e.userId
+            from ReadingEvent e
+            where e.seriesId = :seriesId and e.userId is not null
+            group by e.userId
+            having max(e.occurredAt) <= :cutoff
+            """)
+    List<Long> lapsedReaderIds(@Param("seriesId") Long seriesId, @Param("cutoff") Instant cutoff);
+
+    /**
      * 탈퇴 시 익명화 — 행은 남기고 사용자 연결만 끊는다(설계문서 §9).
      *
      * FK의 on delete set null에 기댈 수 없다: 이 프로젝트의 탈퇴는 soft delete(User.withdraw()가

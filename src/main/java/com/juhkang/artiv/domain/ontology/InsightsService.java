@@ -214,11 +214,10 @@ public class InsightsService {
      * NEW를 마지막 열람으로 판정하면 '3개월 된 독자가 어제 다시 읽음'을 신규로 세게 된다.
      */
     private AudienceSegment classify(Instant firstRead, Instant lastRead, Instant now) {
-        long sinceLast = Duration.between(lastRead, now).toDays();
-        if (sinceLast > AudienceSegment.ACTIVE_DAYS) {
+        if (AudienceSegment.isLapsed(lastRead, now)) {
             return AudienceSegment.LAPSED;
         }
-        if (sinceLast > AudienceSegment.NEW_DAYS) {
+        if (Duration.between(lastRead, now).toDays() > AudienceSegment.NEW_DAYS) {
             return AudienceSegment.AT_RISK;
         }
         return Duration.between(firstRead, now).toDays() <= AudienceSegment.NEW_DAYS
