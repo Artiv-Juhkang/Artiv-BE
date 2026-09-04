@@ -10,6 +10,8 @@ public enum EntryPoint {
     NOTIFICATION("알림"),
     SUBSCRIPTION("구독"),
     AUTHOR("작가 페이지"),
+    /** 서재(관심·열람기록)에서 이어보기 — 신규 유입이 아니라 재방문이다. */
+    LIBRARY("서재"),
     DIRECT("직접 진입");
 
     private final String label;
